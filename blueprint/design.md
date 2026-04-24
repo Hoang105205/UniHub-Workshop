@@ -276,6 +276,8 @@ Lưu trữ thông tin định danh và vai trò của mọi đối tượng tron
 
 - email (String, Unique): Email đăng nhập.
 
+- password_hash (String): Mật khẩu đã được băm (Hash) để bảo mật.
+
 - role (Enum): student, organizer, staff.
 
 B. **Workshops Table**
@@ -290,7 +292,17 @@ Thành phần trung tâm quản lý số lượng chỗ ngồi.
 
 - price (Decimal): Giá vé (0 nếu miễn phí).
 
+- title (String): Tiêu đề workshop.
+
 - detail (Text): Nội dung về workshop.
+
+- start_time (Timestamp): Thời gian bắt đầu workshop.
+
+- end_time (Timestamp): Thời gian kết thúc workshop.
+
+- room (String): Phòng tổ chức.
+
+- speaker (String): Diễn giả.
 
 C. **Registrations Table**  
 Bảng trung gian quản lý mối quan hệ giữa sinh viên và workshop.
@@ -307,10 +319,16 @@ Bảng trung gian quản lý mối quan hệ giữa sinh viên và workshop.
 
 - payment_id (UUID, FK): Liên kết với bảng thanh toán.
 
+- registered_at (Timestamp): Thời điểm đăng ký.
+
+- expires_at (Timestamp): Thời điểm hết hạn giữ chỗ (nếu có).
+
 D. **Payments Table**
 Lưu trữ lịch sử giao dịch và chống trừ tiền hai lần.
 
 - id (UUID, PK): Mã thanh toán.
+
+- registration_id (UUID, FK, Unique): Tham chiếu tới lượt đăng ký (một registration chỉ có một payment).
 
 - idempotency_key (String, Unique): Khóa chống trùng lặp gửi từ Client.
 
@@ -328,8 +346,6 @@ E. **CHECK_INS** (Xử lý Offline & Sync)
 - sync_status (Enum): synced, pending_sync (Dùng trên Mobile SQLite).
 
 - staff_id (UUID, FK): Định danh nhân viên thực hiện check-in.
-
-- 
 
 - checked_in_at (Timestamp): Thời điểm quét mã thực tế (ngay cả khi offline).
 
@@ -349,7 +365,8 @@ E. **CHECK_INS** (Xử lý Offline & Sync)
 
 <!-- Mô hình phân quyền, các nhóm người dùng, cách kiểm tra quyền tại từng điểm truy cập -->
 
-### 1.  Các nhóm người dùng (User Roles)
+### 1. Các nhóm người dùng (User Roles)
+
 Hệ thống định nghĩa 03 nhóm quyền hạn chính:
 
 - Student (Sinh viên): Nhóm người dùng đông đảo nhất (dự kiến 12,000 người), có quyền xem thông tin và thực hiện đăng ký workshop.
@@ -359,87 +376,102 @@ Hệ thống định nghĩa 03 nhóm quyền hạn chính:
 - Staff (Nhân sự hỗ trợ): Nhóm chuyên trách việc vận hành tại sự kiện, tập trung vào tính năng quét mã QR và xác nhận check-in.
 
 ### 2. Ma trận phân quyền (Permission Matrix)
+
 Ma trận dưới đây chi tiết hóa khả năng truy cập tài nguyên của từng vai trò:
 
-| Tài nguyên (Resource)| Hành động (Action) | Student | Organizer | Staff |
-|----------------------|--------------------|---------|-----------|-------|
-| Workshops | Xem danh sách/chi tiết | ✅ | ✅ | ✅ |
-|  | Tạo mới/Sửa/Xóa | ❌ | ✅ | ❌ |
-|  | AI Summary generation | ❌ | ✅ | ❌ |
-| Registrations | Đăng ký tham gia | ✅ | ❌ | ❌ |
-|  | Hủy đăng ký (của bản thân) | ✅ | ❌ | ❌ |
-|  | Xem tất cả danh sách đăng ký | ❌ | ✅ | ❌ |
-| Check-ins | Quét QR & Xác nhận | ❌ | ❌ | ✅ |
-|  | Đồng bộ dữ liệu Offline | ❌ | ❌ | ✅ |
-| Analytics | Xem thống kê số lượng | ❌ | ✅ | ❌ |
-| Data Import | Import CSV sinh viên | ❌ | ✅ | ❌ |
+| Tài nguyên (Resource) | Hành động (Action)           | Student | Organizer | Staff |
+| --------------------- | ---------------------------- | ------- | --------- | ----- |
+| Workshops             | Xem danh sách/chi tiết       | ✅      | ✅        | ✅    |
+|                       | Tạo mới/Sửa/Xóa              | ❌      | ✅        | ❌    |
+|                       | AI Summary generation        | ❌      | ✅        | ❌    |
+| Registrations         | Đăng ký tham gia             | ✅      | ❌        | ❌    |
+|                       | Hủy đăng ký (của bản thân)   | ✅      | ❌        | ❌    |
+|                       | Xem tất cả danh sách đăng ký | ❌      | ✅        | ❌    |
+| Check-ins             | Quét QR & Xác nhận           | ❌      | ❌        | ✅    |
+|                       | Đồng bộ dữ liệu Offline      | ❌      | ❌        | ✅    |
+| Analytics             | Xem thống kê số lượng        | ❌      | ✅        | ❌    |
+| Data Import           | Import CSV sinh viên         | ❌      | ✅        | ❌    |
 
 ### 3. Cơ chế kiểm tra quyền tại các điểm truy cập
+
 Hệ thống thực hiện kiểm tra quyền tại hai cấp độ chính để đảm bảo an ninh lớp lang (Defense in Depth):
 
 - A. Kiểm tra tại Backend (NestJS Guards)
   - Authentication Guard: Sử dụng Passport-JWT để xác thực danh tính người dùng qua Access Token đính kèm trong Header request.
   - Roles Guard: Trích xuất trường role từ JWT Payload và đối chiếu với role cho phép được đặt tại mỗi Controller hoặc Endpoint. Nếu vai trò không khớp, hệ thống sẽ trả về mã lỗi 403 Forbidden.
 - B. Kiểm tra tại Frontend (Next.js)
-    - Middleware Protection: Middleware sẽ chặn các truy cập vào Route Group (admin)/* nếu role trong Token không phải là organizer.
-    - Conditional Rendering: Giao diện sẽ ẩn/hiện các nút bấm (như nút "Tạo Workshop" hay "Thanh toán") dựa trên quyền hạn hiện tại để tránh gây nhầm lẫn cho người dùng.
+  - Middleware Protection: Middleware sẽ chặn các truy cập vào Route Group (admin)/\* nếu role trong Token không phải là organizer.
+  - Conditional Rendering: Giao diện sẽ ẩn/hiện các nút bấm (như nút "Tạo Workshop" hay "Thanh toán") dựa trên quyền hạn hiện tại để tránh gây nhầm lẫn cho người dùng.
 - C. Kiểm tra tại Mobile App
-    - Ứng dụng Expo chỉ cho phép người dùng có role staff đăng nhập.
-    - Mọi yêu cầu đồng bộ (Sync) dữ liệu check-in lên server đều được kiểm tra token một lần nữa tại Backend để tránh trường hợp giả mạo dữ liệu.
-
+  - Ứng dụng Expo chỉ cho phép người dùng có role staff đăng nhập.
+  - Mọi yêu cầu đồng bộ (Sync) dữ liệu check-in lên server đều được kiểm tra token một lần nữa tại Backend để tránh trường hợp giả mạo dữ liệu.
 
 ## Thiết kế các cơ chế bảo vệ hệ thống
 
 ### Kiểm soát tải đột biến
+
 Để bảo vệ hệ thống khỏi các đợt spike traffic (dự kiến 12.000 sinh viên truy cập cùng lúc), hệ thống triển khai cơ chế kiểm soát dựa trên thuật toán Token Bucket.
+
 - Giải pháp: Sử dụng Redis để lưu trữ trạng thái bucket của từng người dùng (theo user_id hoặc IP).
 - Thuật toán: Token Bucket cho phép xử lý các đợt burst traffic ngắn hạn nhưng vẫn đảm bảo tốc độ trung bình không vượt ngưỡng.
 - Cấu hình ngưỡng:
-	+ Student: 10 requests / 10 giây (Phù hợp với thao tác đăng ký).
-	+ Organizer/Staff: 50 - 100 requests / 10 giây (Phù hợp với thao tác quản lý/check-in).
+  - Student: 10 requests / 10 giây (Phù hợp với thao tác đăng ký).
+  - Organizer/Staff: 50 - 100 requests / 10 giây (Phù hợp với thao tác quản lý/check-in).
 - Hành vi khi vượt ngưỡng: Hệ thống sẽ phản hồi mã lỗi 429 Too Many Requests kèm thông báo "Try again in X seconds".
 
 ### Xử lý cổng thanh toán không ổn định
+
 Cổng thanh toán (Stripe/Mock) là thành phần phụ thuộc bên ngoài có rủi ro cao, có thể timeout/error. Nếu cứ gọi liên tục dễ tăng tải gateway, kéo dài thời gian recovery, user experience kém khi phải đợi timeout 10-30s mỗi request. Cơ chế Circuit Breaker giúp ngăn chặn việc treo hệ thống khi đối tác gặp sự cố.
+
 - Giải pháp: Triển khai trạng thái ngắt mạch 3 cấp độ: CLOSED, OPEN, HALF-OPEN.
 - Ngưỡng kích hoạt: Nếu có 5 lỗi liên tiếp (hoặc timeout) trong vòng 1 phút, mạch sẽ chuyển sang trạng thái OPEN.
 - Hành vi khi lỗi:
-	+ Khi mạch OPEN: Mọi yêu cầu thanh toán bị từ chối ngay lập tức để giảm tải cho đối tác và hệ thống.
-	+ Graceful Degradation: Hệ thống vẫn cho phép lưu registration ở trạng thái pending_payment và đưa vào hàng đợi Bull Queue để retry sau khi mạch ổn định (trạng thái HALF-OPEN).
+  - Khi mạch OPEN: Mọi yêu cầu thanh toán bị từ chối ngay lập tức để giảm tải cho đối tác và hệ thống.
+  - Graceful Degradation: Hệ thống vẫn cho phép lưu registration ở trạng thái pending_payment và đưa vào hàng đợi Bull Queue để retry sau khi mạch ổn định (trạng thái HALF-OPEN).
+
 ### Chống trừ tiền hai lần
+
 Tránh việc người dùng nhấn nút "Thanh toán" nhiều lần hoặc do mạng chập chờn dẫn đến duplicate transaction.
+
 - Giải pháp: Idempotency Key
-- Định nghĩa: 
+- Định nghĩa:
   Idempotency: `f(x)` gọi 1 lần = gọi N lần → Kết quả giống hệt nhau
 - Flow:
-	+ Cơ chế: Sử dụng Idempotency Key (UUID v4) được tạo từ phía Client cho mỗi yêu cầu thanh toán.
-	+ Nơi lưu trữ: Redis (lưu kết quả response trong 24h) và Database (Unique constraint cho cột idempotency_key trong bảng payments).
-	+ Luồng xử lý:
-		- Kiểm tra Key trong Redis/DB. Nếu tồn tại, trả về ngay kết quả đã xử lý trước đó.
-		- Nếu chưa, thực hiện thanh toán trong một Database Transaction duy nhất.
-		- Lưu kết quả vào Cache trước khi phản hồi cho Client.
+  - Cơ chế: Sử dụng Idempotency Key (UUID v4) được tạo từ phía Client cho mỗi yêu cầu thanh toán.
+  - Nơi lưu trữ: Redis (lưu kết quả response trong 24h) và Database (Unique constraint cho cột idempotency_key trong bảng payments).
+  - Luồng xử lý:
+    - Kiểm tra Key trong Redis/DB. Nếu tồn tại, trả về ngay kết quả đã xử lý trước đó.
+    - Nếu chưa, thực hiện thanh toán trong một Database Transaction duy nhất.
+    - Lưu kết quả vào Cache trước khi phản hồi cho Client.
+
 ## Các quyết định kỹ thuật quan trọng (ADR)
+
 Lựa chọn NestJS thay vì Express.js
+
 - Quyết định: Sử dụng NestJS làm Framework chính cho Backend.
 - Lý do: NestJS cung cấp cấu trúc module rõ ràng, tích hợp sẵn Dependency Injection, Guards, và Decorators. Điều này giúp nhóm 2-3 người dễ dàng cộng tác và bảo trì.
 - Đánh đổi: Phức tạp hơn Express ban đầu nhưng tiết kiệm 30-40% thời gian code logic nền tảng (validation, auth).
 
 Sử dụng Pessimistic Locking cho việc giữ chỗ
+
 - Quyết định: Sử dụng FOR UPDATE (Pessimistic Write Lock) khi truy vấn số lượng chỗ trống trong workshop.
 - Lý do: Trong kịch bản 12.000 user tranh giành 60 chỗ, Optimistic Locking (dựa trên version) sẽ gây ra tỷ lệ lỗi/retry rất cao. Pessimistic Locking đảm bảo tính toàn vẹn tuyệt đối (0% oversell).
 - Đánh đổi: Throughput giảm nhẹ do các transaction phải đợi nhau, nhưng chấp nhận được vì tính chính xác là ưu tiên hàng đầu.
 
 Bull Queue (Redis-based) thay vì RabbitMQ
+
 - Quyết định: Sử dụng Bull làm Message Broker cho các tác vụ bất đồng bộ (Email, Sync, AI).
 - Lý do: Nhóm đã sử dụng Redis cho Rate Limiting và Caching, việc dùng Bull giúp giảm thiểu số lượng dependency cần cài đặt (không cần Erlang/RabbitMQ). Bull hỗ trợ tốt cơ chế retry và delayed jobs.
 - Đánh đổi: Phụ thuộc vào tính sẵn sàng của Redis. Nếu Redis down, hàng đợi sẽ bị gián đoạn.
 
 Kiến trúc Offline-first cho Mobile Check-in
+
 - Quyết định: Sử dụng Expo SQLite để lưu trữ dữ liệu check-in tạm thời trên thiết bị.
 - Lý do: Đảm bảo nhân sự có thể điểm danh liên tục trong hội trường ngay cả khi mất kết nối mạng. Dữ liệu sẽ tự động đồng bộ (Background Sync) khi có mạng trở lại.
 - Đánh đổi: Phải xử lý logic xung đột dữ liệu khi đồng bộ batch từ nhiều thiết bị khác nhau.
 
 Next.js App Router & Server Components
+
 - Quyết định: Sử dụng Next.js 14 cho Frontend Web.
 - Lý do: Tận dụng Server-Side Rendering (SSR) để tối ưu SEO cho các trang workshop listing và giảm kích thước bundle size gửi xuống trình duyệt (Client-side).
 - Đánh đổi: Phải quản lý sự khác biệt giữa Client và Server Components chặt chẽ hơn so với mô hình SPA truyền thống.
