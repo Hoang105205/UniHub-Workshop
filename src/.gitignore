@@ -1,0 +1,27 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE rác
+.vscode/
+.idea/
+*.swp
+*.DS_Store
+
+# Expo/Mobile rác
+.expo/
+*.jks
+*.p12
+*.apk
+*.ipa
