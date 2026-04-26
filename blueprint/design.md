@@ -408,6 +408,8 @@ E. **CHECK_INS** (Xử lý Offline & Sync)
 
 - staff_id (UUID, FK): Định danh nhân viên thực hiện check-in.
 
+- device_id (String): Mã thiết bị di động đã thực hiện check-in (để xử lý xung đột khi đồng bộ).
+
 - checked_in_at (Timestamp): Thời điểm quét mã thực tế (ngay cả khi offline).
 
 ### 3. Chiến lược Indexing (Optimization)
