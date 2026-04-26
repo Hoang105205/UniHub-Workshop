@@ -32,7 +32,6 @@ Hệ thống xác thực dựa trên **JWT (JSON Web Token)** với 3 vai trò: 
      "email": "student@uni.edu",
      "password": "SecurePass123",
      "studentId": "SV001",
-     "fullName": "Nguyễn Văn A"
    }
 
 2. Backend validate:
@@ -40,18 +39,18 @@ Hệ thống xác thực dựa trên **JWT (JSON Web Token)** với 3 vai trò: 
    b. Check password strength:
       - Minimum 8 characters
       - Ít nhất 1 chữ hoa, 1 chữ thường, 1 số
-   c. Query DB: SELECT * FROM users WHERE student_id = ?
+   c. Query DB: SELECT * FROM users WHERE student_id = ? AND email = ?
       - Nếu NOT FOUND → 403 Forbidden "Student ID not in system"
-      - Nếu FOUND và email khớp → OK
-      - Nếu FOUND nhưng email khác → 409 Conflict "Student ID already registered"
+      - Nếu FOUND và email khớp và chưa có password → OK
+      - Nếu FOUND và email khớp và đã có password → 409 Conflict "Student ID already registered"
 
 3. Hash password với bcrypt (salt rounds = 10)
    hashed_password = bcrypt.hash(password, 10)
 
 4. Update user record:
    UPDATE users
-   SET password_hash = ?, name = ?, updated_at = NOW()
-   WHERE student_id = ?
+   SET password_hash = ?, updated_at = NOW()
+   WHERE student_id = ? AND email = ?
 
 5. Generate JWT token:
    payload = {
