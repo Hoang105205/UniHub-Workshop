@@ -103,6 +103,7 @@ graph TD
     %% Định nghĩa Class màu sắc (C4 Standard)
     classDef person fill:#08427b,stroke:#073b6e,color:#ffffff,stroke-width:2px;
     classDef container fill:#1168bd,stroke:#0b4d8c,color:#ffffff,stroke-width:2px;
+    classDef proxy fill:#d35400,stroke:#a04000,color:#ffffff,stroke-width:2px;
     classDef external fill:#999999,stroke:#666666,color:#ffffff,stroke-width:2px;
     classDef database fill:#1168bd,stroke:#0b4d8c,color:#ffffff,stroke-width:2px;
 
@@ -117,12 +118,15 @@ graph TD
         MA["📱 React Native App<br/>(Staff - Expo)"]:::container
     end
 
+    %% Gateway / Proxy
+    NG["🛡️ Nginx Reverse Proxy<br/>(Rate Limiting Lớp 1, Load Balancer - Port 80/443)"]:::proxy
+
     %% Backend Container
-    BE["⚙️ NestJS Backend API<br/>(REST API, JWT, Rate Limit, Circuit Breaker - Port 4000)"]:::container
+    BE["⚙️ NestJS Backend API<br/>(REST API, JWT, Role Guard, Circuit Breaker - Port 4000)"]:::container
 
     %% Data & Queue Containers
     subgraph Storage_Queue [Data & Messaging]
-        RD[("🧠 Redis<br/>(Cache, Rate Limit, Idempotency)")]:::database
+        RD[("🧠 Redis<br/>(Cache, Rate Limit Lớp 2, Idempotency)")]:::database
         DB[("🗄️ PostgreSQL<br/>(Users, Workshops, Regs, Payments)")]:::database
         BQ["📥 Bull Queue<br/>(Email, Payment, CSV, AI Queues)"]:::container
     end
@@ -144,8 +148,10 @@ graph TD
     U2 --> WP
     U3 --> MA
 
-    WP -->|HTTPS/JSON| BE
-    MA -->|HTTPS/JSON| BE
+    WP -->|HTTPS/JSON| NG
+    MA -->|HTTPS/JSON| NG
+
+    NG -->|HTTP Forwarding| BE
 
     BE --> RD
     BE --> DB
@@ -157,6 +163,61 @@ graph TD
 
     PW --> ExtPG
     AW --> ExtAI
+```
+
+### Level 4 — Deployment Diagram (Môi trường báo cáo/Local Cluster)
+
+Sơ đồ này mô tả cách hệ thống được triển khai thực tế trên một máy chủ đơn lẻ (hoặc laptop) nhưng vẫn mô phỏng được kiến trúc chịu tải cao (High-Availability Cluster) để phục vụ cho buổi bảo vệ đồ án, kết hợp với Database và Redis được host trên Cloud.
+
+```mermaid
+graph TB
+    classDef node fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
+    classDef cloudNode fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000;
+    classDef container fill:#1168bd,stroke:#0b4d8c,color:#ffffff;
+    classDef proxy fill:#d35400,stroke:#a04000,color:#ffffff;
+
+    subgraph Local_Server [💻 Local Development Server / Laptop]
+        direction TB
+
+        CT["🌐 Cloudflare Tunnel<br/>(Expose localhost)"]:::proxy
+
+        subgraph Docker_Compose [🐳 Docker Compose Environment]
+            NX["🛡️ Nginx Container<br/>(Rate Limit: 50 req/s/IP)"]:::proxy
+
+            subgraph PM2_Cluster [⚙️ PM2 Cluster Manager]
+                direction LR
+                N1["NestJS Node 1<br/>(Port 4001)"]:::container
+                N2["NestJS Node 2<br/>(Port 4002)"]:::container
+                N3["NestJS Node ...<br/>(Port 400n)"]:::container
+            end
+
+            W_Nodes["⚙️ Worker Nodes<br/>(Chạy ngầm xử lý Job)"]:::container
+        end
+    end
+
+    subgraph Cloud_Infrastructure [☁️ Cloud Managed Services]
+        direction LR
+        UP[("⚡ Upstash Serverless<br/>(Redis & BullMQ)")]:::cloudNode
+        SP[("🐘 Supabase<br/>(PostgreSQL qua Supavisor)")]:::cloudNode
+    end
+
+    %% Connections
+    Internet((Internet / End Users)) -->|HTTPS| CT
+    CT -->|Traffic| NX
+    NX -->|Round-Robin| N1
+    NX -->|Round-Robin| N2
+    NX -->|Round-Robin| N3
+
+    %% Tách riêng các liên kết để tránh lỗi parse của Mermaid
+    N1 -->|TCP Connection| UP
+    N2 -->|TCP Connection| UP
+    N3 -->|TCP Connection| UP
+    W_Nodes -->|TCP Connection| UP
+
+    N1 -->|Pool Port 6543| SP
+    N2 -->|Pool Port 6543| SP
+    N3 -->|Pool Port 6543| SP
+    W_Nodes -->|Pool Port 6543| SP
 ```
 
 ## High-Level Architecture Diagram
