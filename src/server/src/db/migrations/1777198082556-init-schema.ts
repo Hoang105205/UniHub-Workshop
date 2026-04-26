@@ -1,13 +1,13 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitSchema1777181898241 implements MigrationInterface {
-    name = 'InitSchema1777181898241'
+export class InitSchema1777198082556 implements MigrationInterface {
+    name = 'InitSchema1777198082556'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TYPE "public"."check_ins_sync_status_enum" AS ENUM('synced', 'pending_sync')`);
         await queryRunner.query(`CREATE TABLE "check_ins" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "registration_id" uuid NOT NULL, "staff_id" uuid NOT NULL, "sync_status" "public"."check_ins_sync_status_enum" NOT NULL, "device_id" character varying(100) NOT NULL, "checked_in_at" TIMESTAMP WITH TIME ZONE NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_ec62eb9e9e2b46305f66e50272c" UNIQUE ("registration_id"), CONSTRAINT "REL_ec62eb9e9e2b46305f66e50272" UNIQUE ("registration_id"), CONSTRAINT "PK_fac7f27bc829a454ad477c13f62" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('student', 'staff', 'admin')`);
-        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "student_id" character varying(10), "name" character varying(100) NOT NULL, "email" character varying NOT NULL, "role" "public"."users_role_enum" NOT NULL DEFAULT 'student', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."users_user_role_enum" AS ENUM('student', 'staff', 'admin')`);
+        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "student_id" character varying(10), "full_name" character varying(100) NOT NULL, "email" character varying NOT NULL, "password_hash" character varying, "user_role" "public"."users_user_role_enum" NOT NULL DEFAULT 'student', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."payments_status_enum" AS ENUM('pending', 'success', 'failed')`);
         await queryRunner.query(`CREATE TABLE "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "registration_id" uuid NOT NULL, "idempotency_key" character varying(100) NOT NULL, "transaction_id" character varying(255), "status" "public"."payments_status_enum" NOT NULL DEFAULT 'pending', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_dcf8450959aadff1b025a2434d7" UNIQUE ("registration_id"), CONSTRAINT "UQ_59dcef70bd19850783c84f840e5" UNIQUE ("idempotency_key"), CONSTRAINT "REL_dcf8450959aadff1b025a2434d" UNIQUE ("registration_id"), CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."registrations_status_enum" AS ENUM('pending', 'confirmed', 'cancelled', 'checked_in')`);
@@ -36,7 +36,7 @@ export class InitSchema1777181898241 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "payments"`);
         await queryRunner.query(`DROP TYPE "public"."payments_status_enum"`);
         await queryRunner.query(`DROP TABLE "users"`);
-        await queryRunner.query(`DROP TYPE "public"."users_role_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."users_user_role_enum"`);
         await queryRunner.query(`DROP TABLE "check_ins"`);
         await queryRunner.query(`DROP TYPE "public"."check_ins_sync_status_enum"`);
     }

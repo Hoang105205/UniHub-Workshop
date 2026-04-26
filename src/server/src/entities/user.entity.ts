@@ -18,13 +18,16 @@ export class User {
   @Column({ name: 'student_id', length: 10, nullable: true })
   studentId: string;
 
-  @Column({ length: 100 })
+  @Column({ name: 'full_name', length: 100 })
   name: string;
 
   @Column({ unique: true })
   email: string;
 
-  @Column({ type: 'enum', enum: Role, default: Role.STUDENT })
+  @Column({ name: 'password_hash', nullable: true })
+  passwordHash: string;
+
+  @Column({ name: 'user_role', type: 'enum', enum: Role, default: Role.STUDENT })
   role: Role;
 
   // --- RELATIONSHIPS ---
