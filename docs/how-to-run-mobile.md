@@ -45,7 +45,7 @@ Sau khi thiết bị giả lập đã sẵn sàng, chúng ta tiến hành "bơm"
    ```
 3. Khởi động môi trường Expo
    ```bash
-   npx expo start
+   npm run start
    ```
 4. Bấm phím 'a' trên bàn phím để kết nối với máy ảo Android. App sẽ tự động được cài đặt và chạy trên máy ảo.
 

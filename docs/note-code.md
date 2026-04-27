@@ -29,7 +29,7 @@ npm run dev
 ```bash
 cd client-mobile
 # Khởi động Expo Server
-npx expo start
+npm run start
 
 # Khi Terminal hiện ra mã QR và menu điều khiển:
 # - Bấm phím 'a' để tự động nạp app vào máy ảo Android (Pixel 7)
@@ -71,7 +71,7 @@ Giống như Luồng 1, do Mobile chạy trên thiết bị vật lý/máy ảo,
 ```bash
 cd client-mobile
 # Khởi động môi trường Expo
-npx expo start
+npm run start:docker
 
 # Bấm phím 'a' trên bàn phím để kết nối với máy ảo Android
 ```
