@@ -1,34 +1,38 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
-import AuthShell from '../auth-shell';
-import { register } from '@/lib/auth';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import AuthShell from "../auth-shell";
+import { register } from "@/lib/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [studentId, setStudentId] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    setErrorMessage('');
+    setErrorMessage("");
 
     try {
-      await register({
+      const { user } = await register({
         studentId,
         email,
         password,
       });
-      router.push('/workshops');
+      // Navigate based on user role
+      const redirectPath = user.role === "admin" ? "/admin" : "/workshops";
+      router.push(redirectPath);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to create account right now.',
+        error instanceof Error
+          ? error.message
+          : "Unable to create account right now.",
       );
     } finally {
       setLoading(false);
@@ -41,7 +45,9 @@ export default function RegisterPage() {
       subtitle="Use student ID + email preloaded by CSV import."
     >
       <div className="w-full max-w-md rounded-4xl border border-[#91918c4d] bg-white/90 p-6 shadow-[0_8px_30px_rgba(33,25,34,0.08)] backdrop-blur-sm">
-        <h1 className="text-[1.65rem] font-bold tracking-[-0.03em]">Register</h1>
+        <h1 className="text-[1.65rem] font-bold tracking-[-0.03em]">
+          Register
+        </h1>
         <p className="mt-1.5 text-[#62625b]">
           Password needs uppercase, lowercase, and number.
         </p>
@@ -90,21 +96,19 @@ export default function RegisterPage() {
           </div>
 
           {errorMessage ? (
-            <p className="mt-3 text-sm text-[#9e0a0a]">
-              {errorMessage}
-            </p>
+            <p className="mt-3 text-sm text-[#9e0a0a]">{errorMessage}</p>
           ) : null}
 
           <button
             className="mt-4 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-sm text-white transition hover:-translate-y-px hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
             disabled={loading}
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
         <p className="mt-4 text-sm">
-          Already registered?{' '}
+          Already registered?{" "}
           <Link className="underline" href="/auth/login">
             Sign in
           </Link>

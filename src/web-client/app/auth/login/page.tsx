@@ -1,29 +1,33 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
-import AuthShell from '../auth-shell';
-import { login } from '@/lib/auth';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import AuthShell from "../auth-shell";
+import { login } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    setErrorMessage('');
+    setErrorMessage("");
 
     try {
-      await login(email, password);
-      router.push('/workshops');
+      const { user } = await login(email, password);
+      // Navigate based on user role
+      const redirectPath = user.role === "admin" ? "/admin" : "/workshops";
+      router.push(redirectPath);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to sign in. Please try again.',
+        error instanceof Error
+          ? error.message
+          : "Unable to sign in. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -37,7 +41,6 @@ export default function LoginPage() {
     >
       <div className="w-full max-w-md rounded-4xl border border-[#91918c4d] bg-white/90 p-6 shadow-[0_8px_30px_rgba(33,25,34,0.08)] backdrop-blur-sm">
         <h1 className="text-[1.65rem] font-bold tracking-[-0.03em]">Login</h1>
-        
 
         <form onSubmit={onSubmit} className="mt-4">
           <div className="mt-3 flex flex-col gap-2">
@@ -70,21 +73,19 @@ export default function LoginPage() {
           </div>
 
           {errorMessage ? (
-            <p className="mt-3 text-sm text-[#9e0a0a]">
-              {errorMessage}
-            </p>
+            <p className="mt-3 text-sm text-[#9e0a0a]">{errorMessage}</p>
           ) : null}
 
           <button
             className="mt-4 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-sm text-white transition hover:-translate-y-px hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
         <p className="mt-4 text-sm">
-          No account yet?{' '}
+          No account yet?{" "}
           <Link className="underline" href="/auth/register">
             Create one
           </Link>
