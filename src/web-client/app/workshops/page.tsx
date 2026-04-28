@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { logout } from "@/lib/auth";
 import { fetchWorkshops, WorkshopListItem } from "@/lib/workshops";
@@ -230,9 +231,12 @@ export default function WorkshopPage() {
                         ? `${workshop.availableSeats} seats left`
                         : "Fully booked"}
                     </span>
-                    <button className="rounded-2xl bg-[#e60023] px-3 py-2 text-xs text-white transition hover:-translate-y-px hover:brightness-95">
+                    <Link
+                      className="rounded-2xl bg-[#e60023] px-3 py-2 text-xs text-white transition hover:-translate-y-px hover:brightness-95"
+                      href={`/workshops/${workshop.id}`}
+                    >
                       View detail
-                    </button>
+                    </Link>
                   </div>
                 </article>
               ))}

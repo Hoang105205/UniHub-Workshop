@@ -1,4 +1,12 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,5 +28,15 @@ export class WorkshopsController {
     const resolvedLimit = Math.min(24, Math.max(1, Number(limit) || 9));
 
     return this.workshopsService.listUpcoming(resolvedPage, resolvedLimit);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.STUDENT, Role.ADMIN)
+  async getDetail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() request: { user: { id: string } },
+  ) {
+    return this.workshopsService.getDetail(id, request.user.id);
   }
 }

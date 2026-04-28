@@ -14,6 +14,10 @@ export interface WorkshopListItem {
   speaker: string;
 }
 
+export interface WorkshopDetailResponse extends WorkshopListItem {
+  hasTicket: boolean;
+}
+
 export interface WorkshopListResponse {
   data: WorkshopListItem[];
   meta: {
@@ -29,8 +33,6 @@ const API_BASE_URL =
 
 export async function fetchWorkshops(page: number, limit: number) {
   const token = getAccessToken();
-
-  console.log("Fetching workshops with token:", token);
 
   const response = await fetch(
     `${API_BASE_URL}/workshops?page=${page}&limit=${limit}`,
@@ -56,4 +58,30 @@ export async function fetchWorkshops(page: number, limit: number) {
   }
 
   return data as WorkshopListResponse;
+}
+
+export async function fetchWorkshopDetail(id: string) {
+  const token = getAccessToken();
+
+  const response = await fetch(`${API_BASE_URL}/workshops/${id}`, {
+    method: "GET",
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    credentials: "include",
+  });
+
+  const data = (await response.json().catch(() => null)) as
+    | WorkshopDetailResponse
+    | { message?: string | string[] }
+    | null;
+
+  if (!response.ok) {
+    const message = Array.isArray((data as { message?: string[] })?.message)
+      ? (data as { message?: string[] }).message?.join(", ")
+      : (data as { message?: string })?.message || "Unable to load workshop";
+    throw new Error(message);
+  }
+
+  return data as WorkshopDetailResponse;
 }
