@@ -1,7 +1,7 @@
 -- ============================================================
 -- UniHub Workshop - Seed Data
 -- ============================================================
--- Password hash cho 'password123': $2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO
+-- Password hash cho 'password123': $2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S
 -- (Sử dụng bcrypt với salt rounds = 10)
 -- ============================================================
 
@@ -13,35 +13,35 @@ BEGIN;
 
 -- 1.1. Admin Users (3 users với password)
 INSERT INTO users (id, student_id, email, password_hash, full_name, user_role, created_at, updated_at) VALUES
-('a1111111-1111-1111-1111-111111111111', NULL, 'admin@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Nguyễn Văn Admin', 'admin', NOW(), NOW()),
-('a2222222-2222-2222-2222-222222222222', NULL, 'organizer1@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Trần Thị Hương', 'admin', NOW(), NOW()),
-('a3333333-3333-3333-3333-333333333333', NULL, 'organizer2@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Lê Văn Minh', 'admin', NOW(), NOW());
+('a1111111-1111-1111-1111-111111111111', NULL, 'admin@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Nguyễn Văn Admin', 'admin', NOW(), NOW()),
+('a2222222-2222-2222-2222-222222222222', NULL, 'organizer1@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Trần Thị Hương', 'admin', NOW(), NOW()),
+('a3333333-3333-3333-3333-333333333333', NULL, 'organizer2@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Lê Văn Minh', 'admin', NOW(), NOW());
 
 -- 1.2. Staff Users (5 users với password)
 INSERT INTO users (id, student_id, email, password_hash, full_name, user_role, created_at, updated_at) VALUES
-('b1111111-1111-1111-1111-111111111111', NULL, 'staff1@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Phạm Thị Lan', 'staff', NOW(), NOW()),
-('b2222222-2222-2222-2222-222222222222', NULL, 'staff2@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Hoàng Văn Nam', 'staff', NOW(), NOW()),
-('b3333333-3333-3333-3333-333333333333', NULL, 'staff3@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Vũ Thị Mai', 'staff', NOW(), NOW()),
-('b4444444-4444-4444-4444-444444444444', NULL, 'staff4@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Đặng Văn Tú', 'staff', NOW(), NOW()),
-('b5555555-5555-5555-5555-555555555555', NULL, 'staff5@unihub.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Bùi Thị Hoa', 'staff', NOW(), NOW());
+('b1111111-1111-1111-1111-111111111111', NULL, 'staff1@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Phạm Thị Lan', 'staff', NOW(), NOW()),
+('b2222222-2222-2222-2222-222222222222', NULL, 'staff2@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Hoàng Văn Nam', 'staff', NOW(), NOW()),
+('b3333333-3333-3333-3333-333333333333', NULL, 'staff3@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Vũ Thị Mai', 'staff', NOW(), NOW()),
+('b4444444-4444-4444-4444-444444444444', NULL, 'staff4@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Đặng Văn Tú', 'staff', NOW(), NOW()),
+('b5555555-5555-5555-5555-555555555555', NULL, 'staff5@unihub.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Bùi Thị Hoa', 'staff', NOW(), NOW());
 
 -- 1.3. Student Users - Đã đăng ký (15 students với password)
 INSERT INTO users (id, student_id, email, password_hash, full_name, user_role, created_at, updated_at) VALUES
-('00000001-0000-0000-0000-000000000001', 'SV001', 'nguyen.van.a@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Nguyễn Văn A', 'student', NOW(), NOW()),
-('00000002-0000-0000-0000-000000000002', 'SV002', 'tran.thi.b@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Trần Thị B', 'student', NOW(), NOW()),
-('00000003-0000-0000-0000-000000000003', 'SV003', 'le.van.c@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Lê Văn C', 'student', NOW(), NOW()),
-('00000004-0000-0000-0000-000000000004', 'SV004', 'pham.thi.d@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Phạm Thị D', 'student', NOW(), NOW()),
-('00000005-0000-0000-0000-000000000005', 'SV005', 'hoang.van.e@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Hoàng Văn E', 'student', NOW(), NOW()),
-('00000006-0000-0000-0000-000000000006', 'SV006', 'vu.thi.f@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Vũ Thị F', 'student', NOW(), NOW()),
-('00000007-0000-0000-0000-000000000007', 'SV007', 'dang.van.g@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Đặng Văn G', 'student', NOW(), NOW()),
-('00000008-0000-0000-0000-000000000008', 'SV008', 'bui.thi.h@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Bùi Thị H', 'student', NOW(), NOW()),
-('00000009-0000-0000-0000-000000000009', 'SV009', 'do.van.i@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Đỗ Văn I', 'student', NOW(), NOW()),
-('00000010-0000-0000-0000-000000000010', 'SV010', 'duong.thi.j@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Dương Thị J', 'student', NOW(), NOW()),
-('00000011-0000-0000-0000-000000000011', 'SV011', 'ngo.van.k@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Ngô Văn K', 'student', NOW(), NOW()),
-('00000012-0000-0000-0000-000000000012', 'SV012', 'ly.thi.l@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Lý Thị L', 'student', NOW(), NOW()),
-('00000013-0000-0000-0000-000000000013', 'SV013', 'mai.van.m@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Mai Văn M', 'student', NOW(), NOW()),
-('00000014-0000-0000-0000-000000000014', 'SV014', 'cao.thi.n@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Cao Thị N', 'student', NOW(), NOW()),
-('00000015-0000-0000-0000-000000000015', 'SV015', 'trinh.van.o@student.edu.vn', '$2b$10$K7L1OJ45/1YIV.TQJFv/6uKnBEG1V2pBxRJ7L8/FfQ.vUzr5vXqJO', 'Trịnh Văn O', 'student', NOW(), NOW());
+('00000001-0000-0000-0000-000000000001', 'SV001', 'nguyen.van.a@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Nguyễn Văn A', 'student', NOW(), NOW()),
+('00000002-0000-0000-0000-000000000002', 'SV002', 'tran.thi.b@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Trần Thị B', 'student', NOW(), NOW()),
+('00000003-0000-0000-0000-000000000003', 'SV003', 'le.van.c@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Lê Văn C', 'student', NOW(), NOW()),
+('00000004-0000-0000-0000-000000000004', 'SV004', 'pham.thi.d@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Phạm Thị D', 'student', NOW(), NOW()),
+('00000005-0000-0000-0000-000000000005', 'SV005', 'hoang.van.e@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Hoàng Văn E', 'student', NOW(), NOW()),
+('00000006-0000-0000-0000-000000000006', 'SV006', 'vu.thi.f@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Vũ Thị F', 'student', NOW(), NOW()),
+('00000007-0000-0000-0000-000000000007', 'SV007', 'dang.van.g@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Đặng Văn G', 'student', NOW(), NOW()),
+('00000008-0000-0000-0000-000000000008', 'SV008', 'bui.thi.h@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Bùi Thị H', 'student', NOW(), NOW()),
+('00000009-0000-0000-0000-000000000009', 'SV009', 'do.van.i@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Đỗ Văn I', 'student', NOW(), NOW()),
+('00000010-0000-0000-0000-000000000010', 'SV010', 'duong.thi.j@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Dương Thị J', 'student', NOW(), NOW()),
+('00000011-0000-0000-0000-000000000011', 'SV011', 'ngo.van.k@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Ngô Văn K', 'student', NOW(), NOW()),
+('00000012-0000-0000-0000-000000000012', 'SV012', 'ly.thi.l@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Lý Thị L', 'student', NOW(), NOW()),
+('00000013-0000-0000-0000-000000000013', 'SV013', 'mai.van.m@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Mai Văn M', 'student', NOW(), NOW()),
+('00000014-0000-0000-0000-000000000014', 'SV014', 'cao.thi.n@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Cao Thị N', 'student', NOW(), NOW()),
+('00000015-0000-0000-0000-000000000015', 'SV015', 'trinh.van.o@student.edu.vn', '$2b$10$lO08yECsZDmiWyc1nHuI7uUZl8oNkC70WYsOFtDTngRWO/cuEgC9S', 'Trịnh Văn O', 'student', NOW(), NOW());
 
 -- 1.4. Student Users - Chưa đăng ký (130 students KHÔNG có password - giả lập sync từ CSV)
 -- Sử dụng generate_series để tạo 130 students từ SV016 đến SV145
