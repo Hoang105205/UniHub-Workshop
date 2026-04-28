@@ -1,4 +1,4 @@
-export type Role = 'student' | 'staff' | 'admin';
+export type Role = "student" | "staff" | "admin";
 
 export interface AuthUser {
   id: string;
@@ -13,17 +13,43 @@ interface AuthResponse {
 }
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api";
+
+const ACCESS_TOKEN_KEY = "accessToken";
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function setAccessToken(token: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+function clearAccessToken() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+}
 
 async function handleJsonResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json().catch(() => null)) as
-    | { message?: string | string[] }
-    | null;
+  const data = (await response.json().catch(() => null)) as {
+    message?: string | string[];
+  } | null;
 
   if (!response.ok) {
     const message = Array.isArray(data?.message)
-      ? data.message.join(', ')
-      : data?.message || 'Request failed';
+      ? data.message.join(", ")
+      : data?.message || "Request failed";
     throw new Error(message);
   }
 
@@ -32,15 +58,17 @@ async function handleJsonResponse<T>(response: Response): Promise<T> {
 
 export async function login(email: string, password: string) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    credentials: 'include',
+    credentials: "include",
     body: JSON.stringify({ email, password }),
   });
 
-  return handleJsonResponse<AuthResponse>(response);
+  const result = await handleJsonResponse<AuthResponse>(response);
+  setAccessToken(result.accessToken);
+  return result;
 }
 
 export async function register(payload: {
@@ -49,22 +77,26 @@ export async function register(payload: {
   studentId: string;
 }) {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    credentials: 'include',
+    credentials: "include",
     body: JSON.stringify(payload),
   });
 
-  return handleJsonResponse<AuthResponse>(response);
+  const result = await handleJsonResponse<AuthResponse>(response);
+  setAccessToken(result.accessToken);
+  return result;
 }
 
 export async function logout() {
   const response = await fetch(`${API_BASE_URL}/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
+    method: "POST",
+    credentials: "include",
   });
 
-  return handleJsonResponse<{ message: string }>(response);
+  const result = await handleJsonResponse<{ message: string }>(response);
+  clearAccessToken();
+  return result;
 }

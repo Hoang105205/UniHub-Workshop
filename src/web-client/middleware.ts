@@ -30,6 +30,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/forbidden", request.url));
   }
 
+  if (workshopPath && payload.role === "admin") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
   if (authPath || rootPath) {
     return NextResponse.redirect(new URL("/workshops", request.url));
   }
