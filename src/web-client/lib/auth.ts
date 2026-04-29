@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   fullName: string;
   role: Role;
+  studentId: string;
 }
 
 interface AuthResponse {
@@ -99,4 +100,18 @@ export async function logout() {
   const result = await handleJsonResponse<{ message: string }>(response);
   clearAccessToken();
   return result;
+}
+
+export async function fetchProfile() {
+  const token = getAccessToken();
+
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    method: "GET",
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    credentials: "include",
+  });
+
+  return handleJsonResponse<AuthUser>(response);
 }

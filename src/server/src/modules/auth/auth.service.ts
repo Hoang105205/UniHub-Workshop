@@ -110,6 +110,7 @@ export class AuthService {
       email: user.email,
       fullName: user.name,
       role: user.role,
+      studentId: user.studentId,
     };
   }
 }
