@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { logout } from "@/lib/auth";
 import { fetchWorkshopDetail, WorkshopDetailResponse } from "@/lib/workshops";
 
 function formatDateRange(startTime: string, endTime: string) {
@@ -52,11 +50,6 @@ export default function WorkshopDetailPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const onLogout = async () => {
-    await logout();
-    router.push("/auth/login");
-  };
-
   useEffect(() => {
     if (!workshopId) {
       setErrorMessage("Workshop not found.");
@@ -98,137 +91,104 @@ export default function WorkshopDetailPage() {
   }, [workshopId]);
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6">
-      <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <header className="rounded-[28px] border border-[#91918c4d] bg-white p-5 shadow-[0_8px_30px_rgba(33,25,34,0.08)] sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <span className="w-fit rounded-full border border-[#91918c4d] bg-[hsla(60,20%,98%,.5)] px-3 py-1 text-xs text-[#62625b]">
-                Workshop Details
+    <main>
+      <section className="rounded-[28px] border border-[#91918c4d] bg-white p-5 shadow-[0_8px_30px_rgba(33,25,34,0.08)] sm:p-7">
+        {loading ? (
+          <p className="text-sm text-[#62625b]">Loading workshop...</p>
+        ) : errorMessage ? (
+          <p className="text-sm text-[#9e0a0a]">{errorMessage}</p>
+        ) : workshop ? (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-[#91918c4d] bg-[hsla(60,20%,98%,.5)] px-2.5 py-1 text-[#62625b]">
+                {formatDateRange(workshop.startTime, workshop.endTime)}
               </span>
-              <h1 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-[#211922] sm:text-4xl">
-                {workshop?.title || "Workshop overview"}
-              </h1>
-              <p className="mt-2 text-sm text-[#62625b] sm:text-base">
-                Review the agenda, venue, and registration status.
-              </p>
+              <span
+                className={`rounded-full border px-2.5 py-1 font-semibold ${
+                  Number(workshop.price) > 0
+                    ? "border-[#e6002340] bg-[#e6002312] text-[#e60023]"
+                    : "border-[#103c2540] bg-[#103c2512] text-[#103c25]"
+                }`}
+              >
+                {formatPrice(workshop.price)}
+              </span>
+              <span
+                className={`rounded-full border px-2.5 py-1 font-semibold ${
+                  workshop.availableSeats > 0
+                    ? "border-[#103c2540] bg-[#103c2512] text-[#103c25]"
+                    : "border-[#9e0a0a40] bg-[#9e0a0a12] text-[#9e0a0a]"
+                }`}
+              >
+                {workshop.availableSeats > 0 ? "Open seats" : "Sold out"}
+              </span>
+              {workshop.hasTicket ? (
+                <span className="rounded-full border border-[#103c2540] bg-[#103c2512] px-2.5 py-1 font-semibold text-[#103c25]">
+                  Ticket purchased
+                </span>
+              ) : null}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Link
-                className="rounded-2xl border border-[#91918c4d] px-4 py-2 text-xs text-[#211922] transition hover:-translate-y-px"
-                href="/workshops"
-              >
-                Back to workshops
-              </Link>
-              <button
-                className="rounded-2xl bg-[#e5e5e0] px-4 py-2 text-xs text-black transition hover:-translate-y-px hover:brightness-95"
-                onClick={onLogout}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <section className="rounded-[28px] border border-[#91918c4d] bg-white p-5 shadow-[0_8px_30px_rgba(33,25,34,0.08)] sm:p-7">
-          {loading ? (
-            <p className="text-sm text-[#62625b]">Loading workshop...</p>
-          ) : errorMessage ? (
-            <p className="text-sm text-[#9e0a0a]">{errorMessage}</p>
-          ) : workshop ? (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full border border-[#91918c4d] bg-[hsla(60,20%,98%,.5)] px-2.5 py-1 text-[#62625b]">
-                  {formatDateRange(workshop.startTime, workshop.endTime)}
-                </span>
-                <span
-                  className={`rounded-full border px-2.5 py-1 font-semibold ${
-                    Number(workshop.price) > 0
-                      ? "border-[#e6002340] bg-[#e6002312] text-[#e60023]"
-                      : "border-[#103c2540] bg-[#103c2512] text-[#103c25]"
-                  }`}
-                >
-                  {formatPrice(workshop.price)}
-                </span>
-                <span
-                  className={`rounded-full border px-2.5 py-1 font-semibold ${
-                    workshop.availableSeats > 0
-                      ? "border-[#103c2540] bg-[#103c2512] text-[#103c25]"
-                      : "border-[#9e0a0a40] bg-[#9e0a0a12] text-[#9e0a0a]"
-                  }`}
-                >
-                  {workshop.availableSeats > 0 ? "Open seats" : "Sold out"}
-                </span>
-                {workshop.hasTicket ? (
-                  <span className="rounded-full border border-[#103c2540] bg-[#103c2512] px-2.5 py-1 font-semibold text-[#103c25]">
-                    Ticket purchased
-                  </span>
-                ) : null}
+            <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold tracking-[-0.02em] text-[#211922]">
+                  About this workshop
+                </h2>
+                <p className="text-base leading-relaxed text-[#62625b]">
+                  {workshop.detail}
+                </p>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-bold tracking-[-0.02em] text-[#211922]">
-                    About this workshop
-                  </h2>
-                  <p className="text-base leading-relaxed text-[#62625b]">
-                    {workshop.detail}
-                  </p>
+              <aside className="rounded-[20px] border border-[#91918c40] bg-linear-to-b from-[#f6f6f3] to-[#ffffff] p-4">
+                <h3 className="text-lg font-semibold text-[#211922]">
+                  Key information
+                </h3>
+                <div className="mt-4 grid gap-2 text-sm text-[#62625b]">
+                  <span>
+                    Speaker:{" "}
+                    <span className="font-semibold text-[#211922]">
+                      {workshop.speaker}
+                    </span>
+                  </span>
+                  <span>
+                    Room:{" "}
+                    <span className="font-semibold text-[#211922]">
+                      {workshop.room}
+                    </span>
+                  </span>
+                  <span>
+                    Seats:
+                    <span className="ml-1 font-semibold text-[#211922]">
+                      {workshop.availableSeats} / {workshop.capacity}
+                    </span>
+                  </span>
                 </div>
 
-                <aside className="rounded-[20px] border border-[#91918c40] bg-linear-to-b from-[#f6f6f3] to-[#ffffff] p-4">
-                  <h3 className="text-lg font-semibold text-[#211922]">
-                    Key information
-                  </h3>
-                  <div className="mt-4 grid gap-2 text-sm text-[#62625b]">
-                    <span>
-                      Speaker:{" "}
-                      <span className="font-semibold text-[#211922]">
-                        {workshop.speaker}
-                      </span>
-                    </span>
-                    <span>
-                      Room:{" "}
-                      <span className="font-semibold text-[#211922]">
-                        {workshop.room}
-                      </span>
-                    </span>
-                    <span>
-                      Seats:
-                      <span className="ml-1 font-semibold text-[#211922]">
-                        {workshop.availableSeats} / {workshop.capacity}
-                      </span>
-                    </span>
-                  </div>
-
-                  {workshop.hasTicket ? (
-                    <button
-                      className="mt-5 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-xs text-white opacity-60"
-                      disabled
-                    >
-                      Registration unavailable
-                    </button>
-                  ) : (
-                    <button
-                      className="mt-5 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-xs text-white transition hover:-translate-y-px hover:brightness-95"
-                      onClick={() =>
-                        router.push(`/workshops/${workshop.id}/confirm`)
-                      }
-                    >
-                      Register
-                    </button>
-                  )}
-                  {workshop.hasTicket ? (
-                    <p className="mt-3 text-xs text-[#62625b]">
-                      You already own a ticket for this workshop.
-                    </p>
-                  ) : null}
-                </aside>
-              </div>
+                {workshop.hasTicket ? (
+                  <button
+                    className="mt-5 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-xs text-white opacity-60"
+                    disabled
+                  >
+                    Registration unavailable
+                  </button>
+                ) : (
+                  <button
+                    className="mt-5 w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-xs text-white transition hover:-translate-y-px hover:brightness-95"
+                    onClick={() =>
+                      router.push(`/workshops/${workshop.id}/confirm`)
+                    }
+                  >
+                    Register
+                  </button>
+                )}
+                {workshop.hasTicket ? (
+                  <p className="mt-3 text-xs text-[#62625b]">
+                    You already own a ticket for this workshop.
+                  </p>
+                ) : null}
+              </aside>
             </div>
-          ) : null}
-        </section>
+          </div>
+        ) : null}
       </section>
     </main>
   );
