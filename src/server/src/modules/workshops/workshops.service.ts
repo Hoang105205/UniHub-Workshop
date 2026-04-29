@@ -113,6 +113,7 @@ export class WorkshopsService {
         status: In([
           RegistrationStatus.CONFIRMED,
           RegistrationStatus.CHECKED_IN,
+          RegistrationStatus.PENDING,
         ]),
       },
     });

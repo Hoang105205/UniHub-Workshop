@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchProfile } from "@/lib/auth";
+import { createRegistration } from "@/lib/registrations";
 import { fetchWorkshopDetail, WorkshopDetailResponse } from "@/lib/workshops";
+import { toast } from "sonner";
 
 interface ProfileSummary {
   id: string;
@@ -53,12 +55,14 @@ function formatPrice(price: string) {
 }
 
 export default function WorkshopConfirmPage() {
+  const router = useRouter();
   const params = useParams<{ id?: string | string[] }>();
   const workshopId = Array.isArray(params?.id) ? params?.id[0] : params?.id;
   const [workshop, setWorkshop] = useState<WorkshopDetailResponse | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!workshopId) {
@@ -102,6 +106,44 @@ export default function WorkshopConfirmPage() {
   }, [workshopId]);
 
   const isPaid = workshop ? Number(workshop.price) > 0 : false;
+
+  const handleConfirm = async () => {
+    if (!workshopId) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      console.log("Creating registration for workshop ID:", workshopId);
+      const response = await createRegistration(workshopId);
+
+      if ("paymentId" in response) {
+        toast.info("Registration saved", {
+          description: "Proceed to payment to keep your seat locked in.",
+        });
+        router.push(`/registrations/${response.id}`);
+        return;
+      }
+
+      toast.success("Registration confirmed", {
+        description: "Your ticket has been issued successfully.",
+      });
+      router.push("/registrations/confirm");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to register for this workshop.";
+      setErrorMessage(message);
+      toast.error("Registration failed", {
+        description: message,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <main>
@@ -222,9 +264,14 @@ export default function WorkshopConfirmPage() {
                   </Link>
                   <button
                     className="w-full rounded-2xl bg-[#e60023] px-4 py-2.5 text-xs text-white transition hover:-translate-y-px hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={workshop.hasTicket}
+                    disabled={workshop.hasTicket || submitting}
+                    onClick={handleConfirm}
                   >
-                    {workshop.hasTicket ? "Already registered" : "Confirm"}
+                    {workshop.hasTicket
+                      ? "Already registered"
+                      : submitting
+                        ? "Processing..."
+                        : "Confirm"}
                   </button>
                   {workshop.hasTicket ? (
                     <p className="text-xs text-[#62625b]">
