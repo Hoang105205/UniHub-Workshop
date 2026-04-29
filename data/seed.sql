@@ -157,7 +157,7 @@ INSERT INTO registrations (id, workshop_id, user_id, status, qr_code, registered
 
 -- Thêm registration mới f0000016 cho kịch bản test Failed Payment
 INSERT INTO registrations (id, workshop_id, user_id, status, qr_code, registered_at) VALUES
-('f0000016-0000-0000-0000-000000000016', 'e0000015-0000-0000-0000-000000000015', '00000001-0000-0000-0000-000000000001', 'pending', 'WS-FAILED-TEST-QR', NOW());
+('f0000016-0000-0000-0000-000000000016', 'e0000015-0000-0000-0000-000000000015', '00000001-0000-0000-0000-000000000001', 'cancelled', 'WS-FAILED-TEST-QR', NOW());
 
 -- ============================================================
 -- 4. PAYMENTS (Total: 9 payments matching paid registrations)
