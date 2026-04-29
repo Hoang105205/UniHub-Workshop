@@ -174,8 +174,8 @@ INSERT INTO payments (id, registration_id, idempotency_key, transaction_id, stat
 
 -- 4.2. Pending Payments (Circuit breaker open scenario)
 INSERT INTO payments (id, registration_id, idempotency_key, transaction_id, status, created_at, updated_at) VALUES
-('d0000007-0000-0000-0000-000000000007', 'f0000014-0000-0000-0000-000000000014', 'idem-1714896013000-y5z6a7b8', NULL, 'pending', '2026-05-06 10:00:00', '2026-05-06 10:00:00'),
-('d0000008-0000-0000-0000-000000000008', 'f0000015-0000-0000-0000-000000000015', 'idem-1714896014000-c9d0e1f2', NULL, 'pending', '2026-05-06 11:30:00', '2026-05-06 11:30:00');
+('d0000007-0000-0000-0000-000000000007', 'f0000014-0000-0000-0000-000000000014', NULL, NULL, 'pending', '2026-05-06 10:00:00', '2026-05-06 10:00:00'),
+('d0000008-0000-0000-0000-000000000008', 'f0000015-0000-0000-0000-000000000015', NULL, NULL, 'pending', '2026-05-06 11:30:00', '2026-05-06 11:30:00');
 
 -- 4.3. Failed Payment (card declined scenario)
 INSERT INTO payments (id, registration_id, idempotency_key, transaction_id, status, created_at, updated_at) VALUES

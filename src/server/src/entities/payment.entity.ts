@@ -23,7 +23,12 @@ export class Payment {
   @Column({ name: 'registration_id', type: 'uuid', unique: true })
   registrationId: string;
 
-  @Column({ name: 'idempotency_key', unique: true, length: 100 })
+  @Column({
+    name: 'idempotency_key',
+    unique: true,
+    length: 100,
+    nullable: true,
+  })
   idempotencyKey: string;
 
   @Column({ name: 'transaction_id', length: 255, nullable: true })
