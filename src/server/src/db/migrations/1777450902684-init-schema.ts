@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitSchema1777438675848 implements MigrationInterface {
-    name = 'InitSchema1777438675848'
+export class InitSchema1777450902684 implements MigrationInterface {
+    name = 'InitSchema1777450902684'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TYPE "public"."check_ins_sync_status_enum" AS ENUM('synced', 'pending_sync')`);
@@ -11,7 +11,7 @@ export class InitSchema1777438675848 implements MigrationInterface {
         await queryRunner.query(`CREATE TYPE "public"."payments_status_enum" AS ENUM('pending', 'success', 'failed')`);
         await queryRunner.query(`CREATE TABLE "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "registration_id" uuid NOT NULL, "idempotency_key" character varying(100), "transaction_id" character varying(255), "status" "public"."payments_status_enum" NOT NULL DEFAULT 'pending', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_dcf8450959aadff1b025a2434d7" UNIQUE ("registration_id"), CONSTRAINT "UQ_59dcef70bd19850783c84f840e5" UNIQUE ("idempotency_key"), CONSTRAINT "REL_dcf8450959aadff1b025a2434d" UNIQUE ("registration_id"), CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."registrations_status_enum" AS ENUM('pending', 'confirmed', 'cancelled', 'checked_in')`);
-        await queryRunner.query(`CREATE TABLE "registrations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "workshop_id" uuid NOT NULL, "status" "public"."registrations_status_enum" NOT NULL DEFAULT 'pending', "qr_code" character varying(255) NOT NULL, "payment_id" uuid, "registered_at" TIMESTAMP NOT NULL DEFAULT now(), "expires_at" TIMESTAMP WITH TIME ZONE, "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_5704d03a9fa1e1dd0467adfa0de" UNIQUE ("qr_code"), CONSTRAINT "PK_6013e724d7b22929da9cd7282d1" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "registrations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "workshop_id" uuid NOT NULL, "status" "public"."registrations_status_enum" NOT NULL DEFAULT 'pending', "qr_code" character varying(255), "payment_id" uuid, "registered_at" TIMESTAMP NOT NULL DEFAULT now(), "expires_at" TIMESTAMP WITH TIME ZONE, "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_5704d03a9fa1e1dd0467adfa0de" UNIQUE ("qr_code"), CONSTRAINT "PK_6013e724d7b22929da9cd7282d1" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "uq_registrations_workshop_user" ON "registrations" ("workshop_id", "user_id") `);
         await queryRunner.query(`CREATE TABLE "workshops" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying(255) NOT NULL, "detail" text NOT NULL, "capacity" integer NOT NULL, "registered_count" integer NOT NULL DEFAULT '0', "price" numeric(10,2) NOT NULL DEFAULT '0', "start_time" TIMESTAMP WITH TIME ZONE NOT NULL, "end_time" TIMESTAMP WITH TIME ZONE NOT NULL, "room" character varying(100) NOT NULL, "speaker" character varying(100) NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6d0e82a124f5b53df91c8989848" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "idx_workshops_start_time" ON "workshops" ("start_time") `);

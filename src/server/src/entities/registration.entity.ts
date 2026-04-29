@@ -42,7 +42,7 @@ export class Registration {
   })
   status: RegistrationStatus;
 
-  @Column({ name: 'qr_code', unique: true, length: 255 })
+  @Column({ name: 'qr_code', unique: true, length: 255, nullable: true })
   qrCode: string;
 
   @Column({ name: 'payment_id', type: 'uuid', nullable: true })

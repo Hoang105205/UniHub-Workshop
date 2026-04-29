@@ -152,12 +152,12 @@ INSERT INTO registrations (id, workshop_id, user_id, status, qr_code, registered
 
 -- 3.4. Pending Registrations (đã đăng ký nhưng chưa thanh toán)
 INSERT INTO registrations (id, workshop_id, user_id, status, qr_code, registered_at) VALUES
-('e1ccc6b2-0fb1-4407-a45f-08b2869783b4', '4eef9eae-17a2-41e4-94df-001892f7a557', '7bd9ff84-3913-41f4-8c53-f0356e4db446', 'pending', 'WS-1714896013000-a3b4c5d6', '2026-05-06 10:00:00'),
-('d6a32f4e-baf9-4b1a-850c-b168cf26b566', '3367dacd-815f-4c0c-8bd0-16cff74945da', 'e59a2ef7-f3d7-4c3b-9019-abf3b2c8ba02', 'pending', 'WS-1714896014000-e7f8g9h0', '2026-05-06 11:30:00');
+('e1ccc6b2-0fb1-4407-a45f-08b2869783b4', '4eef9eae-17a2-41e4-94df-001892f7a557', '7bd9ff84-3913-41f4-8c53-f0356e4db446', 'pending', NULL, '2026-05-06 10:00:00'),
+('d6a32f4e-baf9-4b1a-850c-b168cf26b566', '3367dacd-815f-4c0c-8bd0-16cff74945da', 'e59a2ef7-f3d7-4c3b-9019-abf3b2c8ba02', 'pending', NULL, '2026-05-06 11:30:00');
 
 -- Thêm registration mới f0000016 cho kịch bản test Failed Payment
 INSERT INTO registrations (id, workshop_id, user_id, status, qr_code, registered_at) VALUES
-('b1a6bf33-5f2e-4ca4-aa1e-13af0e937d47', '79d1c435-209e-4d80-8414-1490b08008e0', '8318861a-db3d-49b3-a156-7113a50f6390', 'cancelled', 'WS-FAILED-TEST-QR', NOW());
+('b1a6bf33-5f2e-4ca4-aa1e-13af0e937d47', '79d1c435-209e-4d80-8414-1490b08008e0', '8318861a-db3d-49b3-a156-7113a50f6390', 'cancelled', NULL, NOW());
 
 -- ============================================================
 -- 4. PAYMENTS (Total: 9 payments matching paid registrations)
