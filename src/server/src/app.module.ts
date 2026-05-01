@@ -7,11 +7,14 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { RegistrationsModule } from './modules/registrations/registrations.module';
 import { WorkshopsModule } from './modules/workshops/workshops.module';
+import { BullModule } from '@nestjs/bull';
+import { bullConfig } from './config/bull.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(databaseConfig),
+    BullModule.forRootAsync(bullConfig),
     AuthModule,
     RegistrationsModule,
     WorkshopsModule,
