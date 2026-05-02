@@ -46,9 +46,6 @@ export class Registration {
   @Column({ name: 'qr_code', unique: true, length: 255, nullable: true })
   qrCode: string;
 
-  @Column({ name: 'payment_id', type: 'uuid', nullable: true })
-  paymentId: string | null;
-
   @CreateDateColumn({ name: 'registered_at' })
   registeredAt: Date;
 
