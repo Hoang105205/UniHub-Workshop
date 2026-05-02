@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, Not, In } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { generateQrCode } from '../../utils/qr.utils';
 import { Payment, PaymentStatus } from '../../entities/payment.entity';
 import {
@@ -61,7 +62,80 @@ export interface RegistrationListItem {
 
 @Injectable()
 export class RegistrationsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @InjectRepository(Registration)
+    private readonly registrationRepository: Repository<Registration>,
+  ) {}
+
+  async cancelPendingRegistration(registrationId: string): Promise<void> {
+    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+      const registrationRepository = manager.getRepository(Registration);
+      const paymentRepository = manager.getRepository(Payment);
+      const workshopRepository = manager.getRepository(Workshop);
+
+      const registration = await registrationRepository
+        .createQueryBuilder('registration')
+        .leftJoinAndSelect('registration.payment', 'payment')
+        .leftJoinAndSelect('registration.workshop', 'workshop')
+        .where('registration.id = :id', { id: registrationId })
+        // Tham số thứ 3 '["registration"]' báo cho TypeORM/Postgres biết:
+        // CHỈ gắn cờ FOR UPDATE lên bảng registration, không đụng tới payment & workshop
+        .setLock('pessimistic_write', undefined, ['registration'])
+        .getOne();
+
+      if (!registration) {
+        throw new NotFoundException('Registration not found');
+      }
+
+      if (registration.status !== RegistrationStatus.PENDING) {
+        throw new BadRequestException(
+          'Only pending registrations can be cancelled',
+        );
+      }
+
+      // If an idempotency key is present it means payment is being processed
+      if (registration.payment && registration.payment.idempotencyKey) {
+        throw new ConflictException(
+          'Payment is being processed; cannot cancel.',
+        );
+      }
+
+      // mark registration cancelled and update workshop counts
+      registration.status = RegistrationStatus.CANCELLED;
+      registration.expiresAt = null;
+      await registrationRepository.save(registration);
+
+      const workshop = registration.workshop as Workshop;
+      if (workshop) {
+        // lock workshop row and decrement
+        const workshopRow = await workshopRepository.findOne({
+          where: { id: workshop.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (workshopRow) {
+          workshopRow.registeredCount = Math.max(
+            0,
+            (workshopRow.registeredCount || 1) - 1,
+          );
+          await workshopRepository.save(workshopRow);
+        }
+      }
+
+      // mark payment failed if exists
+      if (registration.payment) {
+        const payment = await paymentRepository.findOne({
+          where: { id: registration.payment.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (payment) {
+          payment.status = PaymentStatus.FAILED;
+          await paymentRepository.save(payment);
+        }
+      }
+    });
+  }
 
   async registerTicket(
     userId: string,
@@ -145,6 +219,97 @@ export class RegistrationsService {
     });
   }
 
+  async completePayment(
+    registrationId: string,
+    idempotencyKey: string,
+    transactionId: string,
+  ): Promise<void> {
+    // Đảm bảo tính ACID bằng Transaction
+    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+      // 1. Cập nhật bảng Payment
+      await manager.update(
+        Payment,
+        { registrationId, idempotencyKey },
+        {
+          status: PaymentStatus.SUCCESS,
+          transactionId: transactionId,
+        },
+      );
+
+      // 2. Cập nhật bảng Registration
+      await manager.update(
+        Registration,
+        { id: registrationId },
+        {
+          status: RegistrationStatus.CONFIRMED,
+          qrCode: generateQrCode(),
+          expiresAt: null,
+        },
+      );
+    });
+  }
+
+  async extendExpiryDueToSystemError(
+    registrationId: string,
+    minutes: number = 5,
+  ): Promise<void> {
+    // Logic gia hạn thời gian khi gặp lỗi hệ thống[cite: 37]
+    await this.registrationRepository
+      .createQueryBuilder()
+      .update(Registration)
+      .set({ expiresAt: () => `expires_at + INTERVAL '${minutes} minute'` })
+      .where('id = :id', { id: registrationId })
+      .execute();
+  }
+
+  async handleSystemFailure(registrationId: string): Promise<void> {
+    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+      const registrationRepo = manager.getRepository(Registration);
+      const paymentRepo = manager.getRepository(Payment);
+      const workshopRepo = manager.getRepository(Workshop);
+
+      // 1. Lấy Registration kèm Payment và Workshop, chỉ lock bảng Registration[cite: 15, 37]
+      const registration = await registrationRepo
+        .createQueryBuilder('registration')
+        .leftJoinAndSelect('registration.payment', 'payment')
+        .leftJoinAndSelect('registration.workshop', 'workshop')
+        .where('registration.id = :id', { id: registrationId })
+        .setLock('pessimistic_write', undefined, ['registration'])
+        .getOne();
+
+      if (!registration) return;
+
+      // 2. Cập nhật trạng thái Registration[cite: 15, 28, 37]
+      registration.status = RegistrationStatus.SYSTEM_FAILURE;
+      registration.expiresAt = null;
+      await registrationRepo.save(registration);
+
+      // 3. Cập nhật trạng thái Payment nếu có[cite: 28, 37]
+      if (registration.payment) {
+        await paymentRepo.update(
+          { id: registration.payment.id },
+          { status: PaymentStatus.SYSTEM_FAILURE },
+        );
+      }
+
+      // 4. Trả lại slot cho Workshop (Lock row để an toàn tuyệt đối)
+      if (registration.workshop) {
+        const workshop = await workshopRepo.findOne({
+          where: { id: registration.workshop.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (workshop) {
+          workshop.registeredCount = Math.max(
+            0,
+            (workshop.registeredCount || 0) - 1,
+          );
+          await workshopRepo.save(workshop);
+        }
+      }
+    });
+  }
+
   async getMyConfirmedRegistrations(
     userId: string,
   ): Promise<RegistrationListItem[]> {
@@ -191,6 +356,55 @@ export class RegistrationsService {
     }
 
     return workshop;
+  }
+
+  async validateForPayment(registrationId: string): Promise<void> {
+    const registration = await this.registrationRepository.findOne({
+      where: { id: registrationId },
+    });
+
+    if (!registration) {
+      throw new NotFoundException('Registration not found');
+    }
+
+    const now = new Date();
+    if (registration.expiresAt && registration.expiresAt < now) {
+      throw new BadRequestException(
+        'Registration has expired. Please register again.',
+      );
+    }
+    if (registration.status === RegistrationStatus.CONFIRMED) {
+      throw new BadRequestException('Registration has already been paid.');
+    }
+  }
+
+  async reservePaymentIdempotencyKey(
+    registrationId: string,
+    idempotencyKey: string,
+  ): Promise<void> {
+    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+      const paymentRepository = manager.getRepository(Payment);
+
+      const payment = await paymentRepository.findOne({
+        where: { registrationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!payment) {
+        throw new NotFoundException('Payment not found for this registration');
+      }
+
+      if (payment.idempotencyKey && payment.idempotencyKey !== idempotencyKey) {
+        throw new ConflictException(
+          'Payment for this registration is already being/has been processed.',
+        );
+      }
+
+      if (!payment.idempotencyKey) {
+        payment.idempotencyKey = idempotencyKey;
+        await paymentRepository.save(payment);
+      }
+    });
   }
 
   private assertWorkshopOpen(workshop: Workshop) {
@@ -253,7 +467,16 @@ export class RegistrationsService {
     userId: string,
   ) {
     const existingRegistration = await registrationRepository.findOne({
-      where: { workshopId, userId },
+      where: {
+        workshopId,
+        userId,
+        status: Not(
+          In([
+            RegistrationStatus.SYSTEM_FAILURE,
+            RegistrationStatus.CANCELLED, 
+          ]),
+        ),
+      },
     });
 
     if (existingRegistration) {

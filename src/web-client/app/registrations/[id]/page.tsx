@@ -6,7 +6,10 @@ import { useEffect, useState } from "react";
 import {
   fetchRegistrationDetail,
   RegistrationListItem,
+  cancelRegistration,
 } from "@/lib/registrations";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 
 function formatDateRange(startTime: string, endTime: string) {
@@ -87,6 +90,8 @@ export default function RegistrationDetailPage() {
   );
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const router = useRouter();
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!registrationId) {
@@ -224,10 +229,23 @@ export default function RegistrationDetailPage() {
                         Pay now
                       </Link>
                       <button
-                        className="w-full rounded-2xl border border-[#91918c4d] px-4 py-2 text-xs text-[#211922] opacity-70"
-                        disabled
+                        className="w-full rounded-2xl border border-[#91918c4d] px-4 py-2 text-xs text-[#211922]"
+                        onClick={async () => {
+                          if (!registration) return;
+                          setCancelling(true);
+                          try {
+                            await cancelRegistration(registration.id);
+                            toast.success("Registration cancelled.");
+                            router.push("/registrations/confirm");
+                          } catch (err: any) {
+                            toast.error(err?.message || "Cancel failed");
+                          } finally {
+                            setCancelling(false);
+                          }
+                        }}
+                        disabled={cancelling}
                       >
-                        Cancel registration
+                        {cancelling ? "Cancelling..." : "Cancel registration"}
                       </button>
                     </div>
                   ) : (
