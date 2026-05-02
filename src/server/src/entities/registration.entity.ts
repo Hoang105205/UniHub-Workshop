@@ -23,9 +23,15 @@ export enum RegistrationStatus {
 }
 
 @Entity('registrations')
-@Index('uq_registrations_workshop_user', ['workshopId', 'userId'], {
-  unique: true,
-})
+@Index(
+  'UQ_active_registration', // Tên index (đặt gì cũng được)
+  ['workshopId', 'userId'], // Các cột cần unique
+  { 
+    unique: true, 
+    // Điều kiện: Chỉ unique khi status KHÔNG PHẢI là rác
+    where: `status NOT IN ('${RegistrationStatus.CANCELLED}', '${RegistrationStatus.SYSTEM_FAILURE}')` 
+  }
+)
 export class Registration {
   @PrimaryGeneratedColumn('uuid')
   id: string;
