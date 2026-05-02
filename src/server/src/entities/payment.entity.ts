@@ -13,6 +13,7 @@ export enum PaymentStatus {
   PENDING = 'pending',
   SUCCESS = 'success',
   FAILED = 'failed',
+  SYSTEM_FAILURE = 'system_failure',
 }
 
 @Entity('payments')
