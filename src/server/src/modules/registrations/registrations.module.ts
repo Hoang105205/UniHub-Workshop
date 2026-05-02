@@ -10,5 +10,6 @@ import { RegistrationsService } from './registrations.service';
   imports: [TypeOrmModule.forFeature([Payment, Registration, Workshop])],
   controllers: [RegistrationsController],
   providers: [RegistrationsService],
+  exports: [RegistrationsService],
 })
 export class RegistrationsModule {}

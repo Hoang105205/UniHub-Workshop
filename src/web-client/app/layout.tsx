@@ -12,7 +12,10 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
-        <Toaster position="bottom-right" />
+        <Toaster 
+          position="bottom-right"
+          richColors
+        />
       </body>
     </html>
   );
