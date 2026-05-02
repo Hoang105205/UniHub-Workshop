@@ -18,6 +18,7 @@ export enum RegistrationStatus {
   PENDING = 'pending',
   CONFIRMED = 'confirmed',
   CANCELLED = 'cancelled',
+  SYSTEM_FAILURE = 'system_failure',
   CHECKED_IN = 'checked_in',
 }
 
