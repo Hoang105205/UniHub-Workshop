@@ -1,0 +1,67 @@
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <title>Payment Pending</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f6f7f9;
+        color: #1a1a1a;
+      }
+      .card {
+        max-width: 640px;
+        margin: 24px auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      .meta {
+        margin: 0 0 12px;
+      }
+      .alert {
+        margin: 16px 0;
+        padding: 12px;
+        background: #fff4e5;
+        border: 1px solid #ffd8a8;
+        border-radius: 8px;
+      }
+      .button {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 10px 16px;
+        background: #2f6feb;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 6px;
+      }
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #666666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='card'>
+      <h1>Payment pending</h1>
+      <p class='meta'><strong>Workshop:</strong> {{workshop.title}}</p>
+      <p class='meta'><strong>Time:</strong> {{workshop.startTime}}</p>
+      <p class='meta'><strong>Location:</strong> {{workshop.location}}</p>
+
+      <div class='alert'>
+        Your ticket is only held for 10 minutes. Please complete payment before
+        <strong>{{expiresAt}}</strong>.
+      </div>
+
+      <a class='button' href='{{paymentLink}}'>Pay now</a>
+
+      <p class='footer'>If you already paid, you can ignore this email.</p>
+    </div>
+  </body>
+</html>

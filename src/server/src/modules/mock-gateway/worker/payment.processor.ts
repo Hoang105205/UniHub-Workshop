@@ -101,20 +101,11 @@ export class PaymentProcessor {
     try {
       // Gọi Service để xử lý trọn gói nghiệp vụ DB[cite: 37]
       await this.registrationsService.handleSystemFailure(registrationId);
-
-      // Log giả lập gửi mail
-      await this.sendFailureEmail(registrationId);
     } catch (err) {
       this.logger.error(
         'Lỗi nghiêm trọng khi dọn dẹp sau thất bại vĩnh viễn',
         err,
       );
     }
-  }
-
-  private async sendFailureEmail(registrationId: string) {
-    this.logger.log(`📧 [MOCK EMAIL] Gửi thông báo tới user: 
-    "Rất tiếc, do sự cố kỹ thuật từ cổng thanh toán, giao dịch cho đơn ${registrationId} không thành công. 
-    Chúng tôi đã hủy lượt đăng ký này để đảm bảo quyền lợi cho bạn. Vui lòng thực hiện đăng ký lại."`);
   }
 }

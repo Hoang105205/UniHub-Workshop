@@ -9,13 +9,17 @@ import { RegistrationsModule } from './modules/registrations/registrations.modul
 import { MockGatewayModule } from './modules/mock-gateway/mock-gateway.module';
 import { WorkshopsModule } from './modules/workshops/workshops.module';
 import { BullModule } from '@nestjs/bull';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { bullConfig } from './config/bull.config';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(databaseConfig),
     BullModule.forRootAsync(bullConfig),
+    EventEmitterModule.forRoot({ global: true }),
+    EmailModule,
     AuthModule,
     RegistrationsModule,
     MockGatewayModule,

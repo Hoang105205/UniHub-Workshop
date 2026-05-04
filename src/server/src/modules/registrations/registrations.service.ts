@@ -13,6 +13,21 @@ import {
   RegistrationStatus,
 } from '../../entities/registration.entity';
 import { Workshop } from '../../entities/workshop.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  EMAIL_EVENT_PAYMENT_FAILED,
+  EMAIL_EVENT_PAYMENT_PENDING,
+  EMAIL_EVENT_TICKET_CANCELLED,
+  EMAIL_EVENT_TICKET_CONFIRMED,
+} from '../email/email.constants';
+import {
+  EmailJobBase,
+  PaymentFailedEmailJob,
+  PaymentPendingEmailJob,
+  TicketCancelledEmailJob,
+  TicketConfirmedEmailJob,
+  WorkshopEmailContext,
+} from '../email/email.types';
 
 export interface RegistrationResponse {
   id: string;
@@ -66,6 +81,7 @@ export class RegistrationsService {
     private readonly dataSource: DataSource,
     @InjectRepository(Registration)
     private readonly registrationRepository: Repository<Registration>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async cancelPendingRegistration(registrationId: string): Promise<void> {
@@ -135,88 +151,104 @@ export class RegistrationsService {
         }
       }
     });
+
+    await this.emitTicketCancelled(registrationId);
   }
 
   async registerTicket(
     userId: string,
     workshopId: string,
   ): Promise<RegisterTicketResponse> {
-    return this.dataSource.transaction('SERIALIZABLE', async (manager) => {
-      const workshopRepository = manager.getRepository(Workshop);
-      const registrationRepository = manager.getRepository(Registration);
-      const paymentRepository = manager.getRepository(Payment);
+    const result = await this.dataSource.transaction(
+      'SERIALIZABLE',
+      async (manager) => {
+        const workshopRepository = manager.getRepository(Workshop);
+        const registrationRepository = manager.getRepository(Registration);
+        const paymentRepository = manager.getRepository(Payment);
 
-      const workshop = await this.getWorkshopForUpdate(
-        workshopRepository,
-        workshopId,
-      );
+        const workshop = await this.getWorkshopForUpdate(
+          workshopRepository,
+          workshopId,
+        );
 
-      this.assertWorkshopOpen(workshop);
-      this.assertCapacityAvailable(workshop);
-      await this.assertNotRegistered(
-        registrationRepository,
-        workshopId,
-        userId,
-      );
+        this.assertWorkshopOpen(workshop);
+        this.assertCapacityAvailable(workshop);
+        await this.assertNotRegistered(
+          registrationRepository,
+          workshopId,
+          userId,
+        );
 
-      const isPaid = Number(workshop.price) > 0;
+        const isPaid = Number(workshop.price) > 0;
 
-      if (!isPaid) {
+        if (!isPaid) {
+          const registration = registrationRepository.create({
+            workshopId,
+            userId,
+            status: RegistrationStatus.CONFIRMED,
+            qrCode: generateQrCode(),
+          });
+
+          const savedRegistration =
+            await registrationRepository.save(registration);
+
+          workshop.registeredCount += 1;
+          await workshopRepository.save(workshop);
+
+          return {
+            id: savedRegistration.id,
+            workshopId: savedRegistration.workshopId,
+            userId: savedRegistration.userId,
+            status: savedRegistration.status,
+            qrCode: savedRegistration.qrCode,
+            registeredAt: savedRegistration.registeredAt,
+            workshop: {
+              title: workshop.title,
+              startTime: workshop.startTime,
+            },
+          };
+        }
+
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         const registration = registrationRepository.create({
           workshopId,
           userId,
-          status: RegistrationStatus.CONFIRMED,
-          qrCode: generateQrCode(),
+          status: RegistrationStatus.PENDING,
+          expiresAt,
         });
 
         const savedRegistration =
           await registrationRepository.save(registration);
+
+        const payment = paymentRepository.create({
+          registrationId: savedRegistration.id,
+          status: PaymentStatus.PENDING,
+        });
+
+        const savedPayment = await paymentRepository.save(payment);
 
         workshop.registeredCount += 1;
         await workshopRepository.save(workshop);
 
         return {
           id: savedRegistration.id,
-          workshopId: savedRegistration.workshopId,
-          userId: savedRegistration.userId,
           status: savedRegistration.status,
-          qrCode: savedRegistration.qrCode,
-          registeredAt: savedRegistration.registeredAt,
-          workshop: {
-            title: workshop.title,
-            startTime: workshop.startTime,
-          },
+          paymentId: savedPayment.id,
+          expiresAt: savedRegistration.expiresAt as Date,
+          message: 'Registration created. Please proceed to pay or cancel.',
         };
-      }
+      },
+    );
 
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      const registration = registrationRepository.create({
-        workshopId,
-        userId,
-        status: RegistrationStatus.PENDING,
-        expiresAt,
-      });
+    if ('qrCode' in result) {
+      await this.emitTicketConfirmed(result.id);
+    }
 
-      const savedRegistration = await registrationRepository.save(registration);
+    if ('expiresAt' in result) {
+      await this.emitPaymentPending(result.id, result.expiresAt as Date);
+    }
 
-      const payment = paymentRepository.create({
-        registrationId: savedRegistration.id,
-        status: PaymentStatus.PENDING,
-      });
-
-      const savedPayment = await paymentRepository.save(payment);
-
-      workshop.registeredCount += 1;
-      await workshopRepository.save(workshop);
-
-      return {
-        id: savedRegistration.id,
-        status: savedRegistration.status,
-        paymentId: savedPayment.id,
-        expiresAt: savedRegistration.expiresAt as Date,
-        message: 'Registration created. Please proceed to pay or cancel.',
-      };
-    });
+    return result;
   }
 
   async completePayment(
@@ -247,6 +279,8 @@ export class RegistrationsService {
         },
       );
     });
+
+    await this.emitTicketConfirmed(registrationId);
   }
 
   async extendExpiryDueToSystemError(
@@ -308,6 +342,8 @@ export class RegistrationsService {
         }
       }
     });
+
+    await this.emitPaymentFailed(registrationId);
   }
 
   async getMyConfirmedRegistrations(
@@ -471,10 +507,7 @@ export class RegistrationsService {
         workshopId,
         userId,
         status: Not(
-          In([
-            RegistrationStatus.SYSTEM_FAILURE,
-            RegistrationStatus.CANCELLED, 
-          ]),
+          In([RegistrationStatus.SYSTEM_FAILURE, RegistrationStatus.CANCELLED]),
         ),
       },
     });
@@ -482,5 +515,106 @@ export class RegistrationsService {
     if (existingRegistration) {
       throw new ConflictException('Already registered for this workshop');
     }
+  }
+
+  private async emitTicketConfirmed(registrationId: string) {
+    const payload = await this.buildTicketConfirmedPayload(registrationId);
+    if (!payload) return;
+    this.eventEmitter.emit(EMAIL_EVENT_TICKET_CONFIRMED, payload);
+  }
+
+  private async emitPaymentPending(registrationId: string, expiresAt: Date) {
+    const basePayload = await this.buildBasePayload(registrationId);
+    if (!basePayload) return;
+
+    const payload: PaymentPendingEmailJob = {
+      ...basePayload,
+      expiresAt,
+      paymentLink: this.buildPaymentLink(registrationId),
+    };
+
+    this.eventEmitter.emit(EMAIL_EVENT_PAYMENT_PENDING, payload);
+  }
+
+  private async emitPaymentFailed(registrationId: string) {
+    const payload = await this.buildPaymentFailedPayload(registrationId);
+    if (!payload) return;
+    this.eventEmitter.emit(EMAIL_EVENT_PAYMENT_FAILED, payload);
+  }
+
+  private async emitTicketCancelled(registrationId: string) {
+    const payload = await this.buildTicketCancelledPayload(registrationId);
+    if (!payload) return;
+    this.eventEmitter.emit(EMAIL_EVENT_TICKET_CANCELLED, payload);
+  }
+
+  private async buildTicketConfirmedPayload(
+    registrationId: string,
+  ): Promise<TicketConfirmedEmailJob | null> {
+    const registration = await this.registrationRepository.findOne({
+      where: { id: registrationId },
+      relations: ['user', 'workshop'],
+    });
+
+    if (!registration?.user?.email || !registration.workshop) return null;
+    if (!registration.qrCode) return null;
+
+    return {
+      to: registration.user.email,
+      registrationId,
+      workshop: this.mapWorkshopEmailContext(registration.workshop),
+      qrCode: registration.qrCode,
+    };
+  }
+
+  private async buildTicketCancelledPayload(
+    registrationId: string,
+  ): Promise<TicketCancelledEmailJob | null> {
+    const basePayload = await this.buildBasePayload(registrationId);
+    if (!basePayload) return null;
+
+    return basePayload;
+  }
+
+  private async buildPaymentFailedPayload(
+    registrationId: string,
+  ): Promise<PaymentFailedEmailJob | null> {
+    const basePayload = await this.buildBasePayload(registrationId);
+    if (!basePayload) return null;
+
+    return basePayload;
+  }
+
+  private async buildBasePayload(
+    registrationId: string,
+  ): Promise<EmailJobBase | null> {
+    const registration = await this.registrationRepository.findOne({
+      where: { id: registrationId },
+      relations: ['user', 'workshop'],
+    });
+
+    if (!registration?.user?.email || !registration.workshop) {
+      return null;
+    }
+
+    return {
+      to: registration.user.email,
+      registrationId,
+      workshop: this.mapWorkshopEmailContext(registration.workshop),
+    };
+  }
+
+  private mapWorkshopEmailContext(workshop: Workshop): WorkshopEmailContext {
+    return {
+      title: workshop.title,
+      startTime: workshop.startTime,
+      location: workshop.room,
+    };
+  }
+
+  private buildPaymentLink(registrationId: string) {
+    const base = process.env.PAYMENT_URL_BASE || 'https://example.com/pay';
+    const separator = base.includes('?') ? '&' : '?';
+    return `${base}${separator}registrationId=${registrationId}`;
   }
 }
