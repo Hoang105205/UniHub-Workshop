@@ -18,13 +18,20 @@ export enum RegistrationStatus {
   PENDING = 'pending',
   CONFIRMED = 'confirmed',
   CANCELLED = 'cancelled',
+  SYSTEM_FAILURE = 'system_failure',
   CHECKED_IN = 'checked_in',
 }
 
 @Entity('registrations')
-@Index('uq_registrations_workshop_user', ['workshopId', 'userId'], {
-  unique: true,
-})
+@Index(
+  'UQ_active_registration', // Tên index (đặt gì cũng được)
+  ['workshopId', 'userId'], // Các cột cần unique
+  { 
+    unique: true, 
+    // Điều kiện: Chỉ unique khi status KHÔNG PHẢI là rác
+    where: `status NOT IN ('${RegistrationStatus.CANCELLED}', '${RegistrationStatus.SYSTEM_FAILURE}')` 
+  }
+)
 export class Registration {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -44,9 +51,6 @@ export class Registration {
 
   @Column({ name: 'qr_code', unique: true, length: 255, nullable: true })
   qrCode: string;
-
-  @Column({ name: 'payment_id', type: 'uuid', nullable: true })
-  paymentId: string | null;
 
   @CreateDateColumn({ name: 'registered_at' })
   registeredAt: Date;

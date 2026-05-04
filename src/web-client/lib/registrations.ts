@@ -138,3 +138,38 @@ export async function fetchRegistrationDetail(
 
   return handleJsonResponse<RegistrationListItem>(response);
 }
+
+export async function chargeRegistration(
+  registrationId: string,
+  idempotencyKey: string,
+) {
+  const token = getAccessToken();
+
+  const response = await fetch(`${API_BASE_URL}/mock-gateway/charge`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ registrationId, idempotencyKey }),
+  });
+
+  return handleJsonResponse<{ message: string; status: string }>(response);
+}
+
+export async function cancelRegistration(registrationId: string) {
+  const token = getAccessToken();
+
+  const response = await fetch(`${API_BASE_URL}/mock-gateway/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ registrationId }),
+  });
+
+  return handleJsonResponse<{ message: string; status: string }>(response);
+}

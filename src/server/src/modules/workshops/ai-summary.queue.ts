@@ -1,21 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Redis } from '@upstash/redis';
-import { AI_SUMMARY_QUEUE } from './ai-summary.constants';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
+import { AI_SUMMARY_JOB, AI_SUMMARY_QUEUE } from './ai-summary.constants';
 import { AiSummaryJobData } from './ai-summary.types';
 
 @Injectable()
 export class AiSummaryQueueService {
-  private client: Redis | null = null;
-  private initialized = false;
-
-  private get redis() {
-    if (!this.initialized) {
-      this.client = Redis.fromEnv();
-      this.initialized = true;
-    }
-
-    return this.client as Redis;
-  }
+  constructor(@InjectQueue(AI_SUMMARY_QUEUE) private readonly queue: Queue) {}
 
   async enqueue(job: AiSummaryJobData) {
     const payload: AiSummaryJobData = {
@@ -25,6 +16,19 @@ export class AiSummaryQueueService {
       runAt: job.runAt || Date.now(),
     };
 
-    await this.redis.lpush(AI_SUMMARY_QUEUE, JSON.stringify(payload));
+    const delay =
+      payload.runAt && payload.runAt > Date.now()
+        ? payload.runAt - Date.now()
+        : 0;
+
+    await this.queue.add(AI_SUMMARY_JOB, payload, {
+      jobId: payload.id,
+      attempts: 3,
+      delay: delay || undefined,
+      backoff: {
+        type: 'exponential', // Tăng dần thời gian chờ sau mỗi lần lỗi
+        delay: 5000,         // Lần 1 chờ 5s, lần 2 chờ 10s, lần 3 chờ 20s...
+      }
+    });
   }
 }

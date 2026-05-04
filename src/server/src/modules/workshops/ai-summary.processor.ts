@@ -1,20 +1,18 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Redis } from '@upstash/redis';
 import { Repository } from 'typeorm';
 import pdfParse from 'pdf-parse';
 import { Workshop } from '../../entities/workshop.entity';
-import { AI_SUMMARY_QUEUE } from './ai-summary.constants';
+import { Processor, Process } from '@nestjs/bull';
+import type { Job } from 'bull';
+import { AI_SUMMARY_JOB, AI_SUMMARY_QUEUE } from './ai-summary.constants';
 import { AiSummaryJobData } from './ai-summary.types';
 import { AiSummaryService } from './ai-summary.service';
 
+@Processor(AI_SUMMARY_QUEUE)
 @Injectable()
-export class AiSummaryProcessor implements OnModuleInit, OnModuleDestroy {
+export class AiSummaryProcessor {
   private readonly logger = new Logger(AiSummaryProcessor.name);
-  private pollingTimer: NodeJS.Timeout | null = null;
-  private processing = false;
-  private client: Redis | null = null;
-  private initialized = false;
 
   constructor(
     @InjectRepository(Workshop)
@@ -22,101 +20,12 @@ export class AiSummaryProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly aiSummaryService: AiSummaryService,
   ) {}
 
-  private get redis() {
-    if (!this.initialized) {
-      this.client = Redis.fromEnv();
-      this.initialized = true;
-    }
-
-    return this.client as Redis;
-  }
-
-  onModuleInit() {
-    this.pollingTimer = setInterval(() => {
-      void this.drainQueue();
-    }, 3000);
-  }
-
-  onModuleDestroy() {
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer);
-      this.pollingTimer = null;
-    }
-  }
-
-  private async drainQueue() {
-    if (this.processing) {
-      return;
-    }
-
-    this.processing = true;
-
-    try {
-      while (true) {
-        const rawJob = await this.redis.rpop(AI_SUMMARY_QUEUE);
-        this.logger.debug(`Polled AI summary job: ${JSON.stringify(rawJob)}`);
-        const job = this.parseJob(rawJob);
-        if (!job) {
-          return;
-        }
-
-        if ((job.runAt ?? 0) > Date.now()) {
-          await this.redis.lpush(AI_SUMMARY_QUEUE, JSON.stringify(job));
-          return;
-        }
-
-        try {
-          await this.handle(job);
-        } catch (error) {
-          const nextAttempts = (job.attempts || 0) + 1;
-
-          if (nextAttempts >= 3) {
-            this.logger.error(
-              `AI summary job failed after ${nextAttempts} attempts for workshop ${job.workshopId}`,
-              error instanceof Error ? error.stack : undefined,
-            );
-            continue;
-          }
-
-          this.logger.warn(
-            `Retrying AI summary job for workshop ${job.workshopId}, attempt ${nextAttempts}`,
-          );
-          await this.redis.lpush(
-            AI_SUMMARY_QUEUE,
-            JSON.stringify({
-              ...job,
-              attempts: nextAttempts,
-              runAt: Date.now() + 5000 * 2 ** (nextAttempts - 1),
-            }),
-          );
-        }
-      }
-    } finally {
-      this.processing = false;
-    }
-  }
-
-  private parseJob(rawJob: unknown): AiSummaryJobData | null {
-    if (!rawJob) {
-      return null;
-    }
-
-    if (typeof rawJob === 'string') {
-      return JSON.parse(rawJob) as AiSummaryJobData;
-    }
-
-    if (typeof rawJob === 'object') {
-      return rawJob as AiSummaryJobData;
-    }
-
-    return null;
-  }
-
-  private async handle(job: AiSummaryJobData) {
-    const { workshopId, pdfUrl, detailSnapshot } = job;
+  @Process(AI_SUMMARY_JOB)
+  async handle(job: Job<AiSummaryJobData>) {
+    const { workshopId, pdfUrl, detailSnapshot } = job.data;
 
     const pdfBuffer = await this.downloadPdf(pdfUrl);
-    console.log(`Downloaded PDF for workshop ${workshopId}, size: ${pdfBuffer.length} bytes`);
+
     const extractedText = await this.extractText(pdfBuffer);
 
     const summary = await this.aiSummaryService.summarize(extractedText);
