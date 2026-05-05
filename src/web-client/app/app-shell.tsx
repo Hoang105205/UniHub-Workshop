@@ -23,16 +23,25 @@ const studentTabs: TopBarTab[] = [
 ];
 
 const adminTabs: TopBarTab[] = [
-  { id: "view-analytics", label: "View analytics", href: "/admin" },
-  { id: "create-workshop", label: "Create workshop" },
+  { id: "view-analytics", label: "View analytics", href: "/admin/analytics" },
+  { id: "create-workshop", label: "Create workshop", href: "/admin/workshops?mode=new" },
 ];
 
 function getTopBarMeta(pathname: string) {
+  if (pathname.startsWith("/admin/workshops")) {
+    return {
+      label: "Workshop studio",
+      title: "Build and refine workshop sessions",
+      subtitle: "Create new sessions, edit details, and keep the catalog fresh.",
+      backHref: "/admin/analytics",
+    };
+  }
+
   if (pathname.startsWith("/admin")) {
     return {
-      label: "Admin workspace",
-      title: "Manage workshops and reporting",
-      subtitle: "View analytics or create new workshop sessions for students.",
+      label: "Analytics hub",
+      title: "Monitor demand and performance",
+      subtitle: "Track registrations, capacity, and revenue signals in real time.",
       backHref: undefined as string | undefined,
     };
   }
@@ -145,13 +154,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     [role],
   );
   const meta = useMemo(() => getTopBarMeta(pathname), [pathname]);
-  const activeTab = pathname.startsWith("/admin")
-    ? "view-analytics"
-    : pathname.startsWith("/registrations/pending")
-      ? "awaiting-payment"
-      : pathname.startsWith("/registrations")
-        ? "my-tickets"
-        : "explore";
+  const activeTab = pathname.startsWith("/admin/workshops")
+    ? "create-workshop"
+    : pathname.startsWith("/admin")
+      ? "view-analytics"
+      : pathname.startsWith("/registrations/pending")
+        ? "awaiting-payment"
+        : pathname.startsWith("/registrations")
+          ? "my-tickets"
+          : "explore";
 
   const onLogout = async () => {
     await logout();
@@ -181,14 +192,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-3">
-                {meta.backHref ? (
-                  <Link
-                    className="rounded-2xl border border-[#211922] bg-white px-4 py-2 text-xs font-semibold text-[#211922] shadow-[0_6px_16px_rgba(33,25,34,0.08)] transition hover:-translate-y-px"
-                    href={meta.backHref}
-                  >
-                    Back
-                  </Link>
-                ) : null}
                 <div className="rounded-[18px] border border-[#91918c4d] bg-white px-3 py-2 text-xs text-[#62625b]">
                   <p className="font-semibold text-[#211922]">
                     {profile?.fullName || "Signed-in user"}

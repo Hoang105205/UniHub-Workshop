@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const { user } = await login(email, password);
       // Navigate based on user role
-      const redirectPath = user.role === "admin" ? "/admin" : "/workshops";
+      const redirectPath = user.role === "admin" ? "/admin/analytics" : "/workshops";
       router.push(redirectPath);
     } catch (error) {
       setErrorMessage(

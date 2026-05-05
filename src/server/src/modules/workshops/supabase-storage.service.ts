@@ -16,7 +16,6 @@ export class SupabaseStorageService {
     const supabaseKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
     const bucketName = process.env.SUPABASE_BUCKET;
-
     if (!supabaseUrl || !supabaseKey || !bucketName) {
       throw new Error(
         'SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY), and SUPABASE_BUCKET are required for PDF uploads',
