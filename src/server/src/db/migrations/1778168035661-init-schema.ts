@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitSchema1777725652098 implements MigrationInterface {
-    name = 'InitSchema1777725652098'
+export class InitSchema1778168035661 implements MigrationInterface {
+    name = 'InitSchema1778168035661'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TYPE "public"."check_ins_sync_status_enum" AS ENUM('synced', 'pending_sync')`);
@@ -15,6 +15,8 @@ export class InitSchema1777725652098 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_active_registration" ON "registrations" ("workshop_id", "user_id") WHERE status NOT IN ('cancelled', 'system_failure')`);
         await queryRunner.query(`CREATE TABLE "workshops" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying(255) NOT NULL, "detail" text NOT NULL, "capacity" integer NOT NULL, "registered_count" integer NOT NULL DEFAULT '0', "price" numeric(10,2) NOT NULL DEFAULT '0', "start_time" TIMESTAMP WITH TIME ZONE NOT NULL, "end_time" TIMESTAMP WITH TIME ZONE NOT NULL, "room" character varying(100) NOT NULL, "speaker" character varying(100) NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6d0e82a124f5b53df91c8989848" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "idx_workshops_start_time" ON "workshops" ("start_time") `);
+        await queryRunner.query(`CREATE TYPE "public"."sync_histories_status_enum" AS ENUM('PROCESSING', 'SUCCESS', 'FAILED')`);
+        await queryRunner.query(`CREATE TABLE "sync_histories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "filename" character varying(255) NOT NULL, "status" "public"."sync_histories_status_enum" NOT NULL, "total_records_processed" integer NOT NULL DEFAULT '0', "error_message" text, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_144f5156207e0829e9a1eff0a26" PRIMARY KEY ("id"))`);
         await queryRunner.query(`ALTER TABLE "check_ins" ADD CONSTRAINT "FK_ec62eb9e9e2b46305f66e50272c" FOREIGN KEY ("registration_id") REFERENCES "registrations"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "check_ins" ADD CONSTRAINT "FK_a8f00d1aa1dfd6f6307e1abe494" FOREIGN KEY ("staff_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "payments" ADD CONSTRAINT "FK_dcf8450959aadff1b025a2434d7" FOREIGN KEY ("registration_id") REFERENCES "registrations"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
@@ -28,6 +30,8 @@ export class InitSchema1777725652098 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_dcf8450959aadff1b025a2434d7"`);
         await queryRunner.query(`ALTER TABLE "check_ins" DROP CONSTRAINT "FK_a8f00d1aa1dfd6f6307e1abe494"`);
         await queryRunner.query(`ALTER TABLE "check_ins" DROP CONSTRAINT "FK_ec62eb9e9e2b46305f66e50272c"`);
+        await queryRunner.query(`DROP TABLE "sync_histories"`);
+        await queryRunner.query(`DROP TYPE "public"."sync_histories_status_enum"`);
         await queryRunner.query(`DROP INDEX "public"."idx_workshops_start_time"`);
         await queryRunner.query(`DROP TABLE "workshops"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_active_registration"`);
