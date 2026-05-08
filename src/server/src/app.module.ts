@@ -12,6 +12,7 @@ import { BullModule } from '@nestjs/bull';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { bullConfig } from './config/bull.config';
 import { EmailModule } from './modules/email/email.module';
+import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EmailModule } from './modules/email/email.module';
     BullModule.forRootAsync(bullConfig),
     EventEmitterModule.forRoot({ global: true }),
     EmailModule,
+    CsvSyncModule,
     AuthModule,
     RegistrationsModule,
     MockGatewayModule,
