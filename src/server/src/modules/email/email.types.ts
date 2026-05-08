@@ -1,24 +1,15 @@
-export interface WorkshopEmailContext {
-  title: string;
-  startTime: Date;
-  location: string;
+import { 
+  TicketConfirmedNotificationJob,
+  PaymentPendingNotificationJob,
+  PaymentFailedNotificationJob,
+  TicketCancelledNotificationJob
+} from '../notification/notification.types';
+
+export interface TicketConfirmedEmailJob extends TicketConfirmedNotificationJob {
+  // cc?: string[];
+  // bcc?: string[];
 }
 
-export interface EmailJobBase {
-  to: string;
-  registrationId: string;
-  workshop: WorkshopEmailContext;
-}
-
-export interface TicketConfirmedEmailJob extends EmailJobBase {
-  qrCode: string;
-}
-
-export interface PaymentPendingEmailJob extends EmailJobBase {
-  expiresAt: Date;
-  paymentLink: string;
-}
-
-export interface PaymentFailedEmailJob extends EmailJobBase {}
-
-export interface TicketCancelledEmailJob extends EmailJobBase {}
+export interface PaymentPendingEmailJob extends PaymentPendingNotificationJob {}
+export interface PaymentFailedEmailJob extends PaymentFailedNotificationJob {}
+export interface TicketCancelledEmailJob extends TicketCancelledNotificationJob {}

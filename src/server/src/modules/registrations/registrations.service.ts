@@ -15,19 +15,19 @@ import {
 import { Workshop } from '../../entities/workshop.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  EMAIL_EVENT_PAYMENT_FAILED,
-  EMAIL_EVENT_PAYMENT_PENDING,
-  EMAIL_EVENT_TICKET_CANCELLED,
-  EMAIL_EVENT_TICKET_CONFIRMED,
-} from '../email/email.constants';
+  DOMAIN_EVENT_TICKET_CONFIRMED,
+  DOMAIN_EVENT_PAYMENT_PENDING,
+  DOMAIN_EVENT_PAYMENT_FAILED,
+  DOMAIN_EVENT_TICKET_CANCELLED,
+} from '../notification/notification.constants';
 import {
-  EmailJobBase,
-  PaymentFailedEmailJob,
-  PaymentPendingEmailJob,
-  TicketCancelledEmailJob,
-  TicketConfirmedEmailJob,
-  WorkshopEmailContext,
-} from '../email/email.types';
+  WorkshopNotificationContext,
+  BaseNotificationJob,
+  TicketConfirmedNotificationJob,
+  PaymentPendingNotificationJob,
+  PaymentFailedNotificationJob,
+  TicketCancelledNotificationJob,
+} from '../notification/notification.types';
 
 export interface RegistrationResponse {
   id: string;
@@ -520,37 +520,37 @@ export class RegistrationsService {
   private async emitTicketConfirmed(registrationId: string) {
     const payload = await this.buildTicketConfirmedPayload(registrationId);
     if (!payload) return;
-    this.eventEmitter.emit(EMAIL_EVENT_TICKET_CONFIRMED, payload);
+    this.eventEmitter.emit(DOMAIN_EVENT_TICKET_CONFIRMED, payload);
   }
 
   private async emitPaymentPending(registrationId: string, expiresAt: Date) {
     const basePayload = await this.buildBasePayload(registrationId);
     if (!basePayload) return;
 
-    const payload: PaymentPendingEmailJob = {
+    const payload: PaymentPendingNotificationJob = {
       ...basePayload,
       expiresAt,
       paymentLink: this.buildPaymentLink(registrationId),
     };
 
-    this.eventEmitter.emit(EMAIL_EVENT_PAYMENT_PENDING, payload);
+    this.eventEmitter.emit(DOMAIN_EVENT_PAYMENT_PENDING, payload);
   }
 
   private async emitPaymentFailed(registrationId: string) {
     const payload = await this.buildPaymentFailedPayload(registrationId);
     if (!payload) return;
-    this.eventEmitter.emit(EMAIL_EVENT_PAYMENT_FAILED, payload);
+    this.eventEmitter.emit(DOMAIN_EVENT_PAYMENT_FAILED, payload);
   }
 
   private async emitTicketCancelled(registrationId: string) {
     const payload = await this.buildTicketCancelledPayload(registrationId);
     if (!payload) return;
-    this.eventEmitter.emit(EMAIL_EVENT_TICKET_CANCELLED, payload);
+    this.eventEmitter.emit(DOMAIN_EVENT_TICKET_CANCELLED, payload);
   }
 
   private async buildTicketConfirmedPayload(
     registrationId: string,
-  ): Promise<TicketConfirmedEmailJob | null> {
+  ): Promise<TicketConfirmedNotificationJob | null> {
     const registration = await this.registrationRepository.findOne({
       where: { id: registrationId },
       relations: ['user', 'workshop'],
@@ -569,7 +569,7 @@ export class RegistrationsService {
 
   private async buildTicketCancelledPayload(
     registrationId: string,
-  ): Promise<TicketCancelledEmailJob | null> {
+  ): Promise<TicketCancelledNotificationJob | null> {
     const basePayload = await this.buildBasePayload(registrationId);
     if (!basePayload) return null;
 
@@ -578,7 +578,7 @@ export class RegistrationsService {
 
   private async buildPaymentFailedPayload(
     registrationId: string,
-  ): Promise<PaymentFailedEmailJob | null> {
+  ): Promise<PaymentFailedNotificationJob | null> {
     const basePayload = await this.buildBasePayload(registrationId);
     if (!basePayload) return null;
 
@@ -587,7 +587,7 @@ export class RegistrationsService {
 
   private async buildBasePayload(
     registrationId: string,
-  ): Promise<EmailJobBase | null> {
+  ): Promise<BaseNotificationJob | null> {
     const registration = await this.registrationRepository.findOne({
       where: { id: registrationId },
       relations: ['user', 'workshop'],
@@ -604,7 +604,7 @@ export class RegistrationsService {
     };
   }
 
-  private mapWorkshopEmailContext(workshop: Workshop): WorkshopEmailContext {
+  private mapWorkshopEmailContext(workshop: Workshop): WorkshopNotificationContext {
     return {
       title: workshop.title,
       startTime: workshop.startTime,

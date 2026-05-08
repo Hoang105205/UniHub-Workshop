@@ -11,7 +11,7 @@ import { WorkshopsModule } from './modules/workshops/workshops.module';
 import { BullModule } from '@nestjs/bull';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { bullConfig } from './config/bull.config';
-import { EmailModule } from './modules/email/email.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
 
 @Module({
@@ -20,7 +20,7 @@ import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
     TypeOrmModule.forRoot(databaseConfig),
     BullModule.forRootAsync(bullConfig),
     EventEmitterModule.forRoot({ global: true }),
-    EmailModule,
+    NotificationModule,
     CsvSyncModule,
     AuthModule,
     RegistrationsModule,
