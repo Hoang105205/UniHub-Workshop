@@ -24,15 +24,31 @@ const studentTabs: TopBarTab[] = [
 
 const adminTabs: TopBarTab[] = [
   { id: "view-analytics", label: "View analytics", href: "/admin/analytics" },
-  { id: "create-workshop", label: "Create workshop", href: "/admin/workshops?mode=new" },
+  { id: "csv-sync", label: "CSV sync history", href: "/admin/csv-sync" },
+  {
+    id: "create-workshop",
+    label: "Create workshop",
+    href: "/admin/workshops?mode=new",
+  },
 ];
 
 function getTopBarMeta(pathname: string) {
+  if (pathname.startsWith("/admin/csv-sync")) {
+    return {
+      label: "CSV sync history",
+      title: "Review CSV synchronization logs",
+      subtitle:
+        "Track processed files, sync status, and record counts for each batch.",
+      backHref: "/admin/analytics",
+    };
+  }
+
   if (pathname.startsWith("/admin/workshops")) {
     return {
       label: "Workshop studio",
       title: "Build and refine workshop sessions",
-      subtitle: "Create new sessions, edit details, and keep the catalog fresh.",
+      subtitle:
+        "Create new sessions, edit details, and keep the catalog fresh.",
       backHref: "/admin/analytics",
     };
   }
@@ -41,7 +57,8 @@ function getTopBarMeta(pathname: string) {
     return {
       label: "Analytics hub",
       title: "Monitor demand and performance",
-      subtitle: "Track registrations, capacity, and revenue signals in real time.",
+      subtitle:
+        "Track registrations, capacity, and revenue signals in real time.",
       backHref: undefined as string | undefined,
     };
   }
@@ -154,15 +171,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     [role],
   );
   const meta = useMemo(() => getTopBarMeta(pathname), [pathname]);
-  const activeTab = pathname.startsWith("/admin/workshops")
-    ? "create-workshop"
-    : pathname.startsWith("/admin")
-      ? "view-analytics"
-      : pathname.startsWith("/registrations/pending")
-        ? "awaiting-payment"
-        : pathname.startsWith("/registrations")
-          ? "my-tickets"
-          : "explore";
+
+  // If this is an auth route (login/register), render children without the shell
+  if (isAuthRoute) return <>{children}</>;
+
+  // Compute active tab more robustly based on role and pathname.
+  let activeTab = "explore";
+
+  if (role === "admin") {
+    // Prefer direct startsWith matches against adminTabs
+    const stripPath = (href: string) => href.split("?")[0];
+    const match = adminTabs.find(
+      (t) => t.href && pathname.startsWith(stripPath(t.href)),
+    );
+    activeTab = match?.id ?? "view-analytics";
+  } else {
+    // Student routes: try to match studentTabs; fallback to route-based heuristics
+    const stripPath = (href: string) => href.split("?")[0];
+    const match = studentTabs.find(
+      (t) => t.href && pathname.startsWith(stripPath(t.href)),
+    );
+    if (match) {
+      activeTab = match.id;
+    } else if (pathname.startsWith("/registrations")) {
+      activeTab = "my-tickets";
+    } else if (pathname.startsWith("/workshops")) {
+      activeTab = "explore";
+    }
+  }
 
   const onLogout = async () => {
     await logout();
