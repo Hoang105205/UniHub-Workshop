@@ -2,6 +2,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerAsyncOptions } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { Redis } from 'ioredis';
+import { RATE_LIMIT } from './rate-limit.config';
 
 export const getThrottlerConfig: ThrottlerAsyncOptions = {
   imports: [ConfigModule],
@@ -22,8 +23,7 @@ export const getThrottlerConfig: ThrottlerAsyncOptions = {
       throttlers: [
         {
           name: 'default',
-          ttl: 60000, // Thời gian sống: 1 phút
-          limit: 30, // Tối đa 30 request / 1 phút
+          ...RATE_LIMIT.READ, // default sẽ là rate limit của các endpoint đọc (GET)
         },
       ],
     };
