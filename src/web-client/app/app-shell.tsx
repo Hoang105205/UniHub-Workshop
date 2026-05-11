@@ -131,6 +131,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isAuthRoute = pathname.startsWith("/auth");
   const [profile, setProfile] = useState<{
+    id: string;
     fullName: string;
     email: string;
     role: string;
@@ -148,6 +149,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           return;
         }
         setProfile({
+          id: data.id,
           fullName: data.fullName,
           email: data.email,
           role: data.role,
