@@ -27,8 +27,10 @@ export class AiSummaryQueueService {
       delay: delay || undefined,
       backoff: {
         type: 'exponential', // Tăng dần thời gian chờ sau mỗi lần lỗi
-        delay: 5000,         // Lần 1 chờ 5s, lần 2 chờ 10s, lần 3 chờ 20s...
-      }
+        delay: 5000, // Lần 1 chờ 5s, lần 2 chờ 10s, lần 3 chờ 20s...
+      },
+      removeOnComplete: true, // Xóa NGAY LẬP TỨC khỏi Redis khi job chạy thành công (Status 200 OK)
+      removeOnFail: false, // Giữ lại job trong Redis nếu đã thử 3 lần mà vẫn lỗi (Status 500), để sau này có thể inspect thủ công hoặc retry thủ công qua Dashboard
     });
   }
 }

@@ -13,12 +13,17 @@ import { AuthService, JwtPayload } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
+import { UserThrottlerGuard } from '../../common/guards/user-throttler.guard';
+import { RATE_LIMIT } from '../../config/rate-limit.config';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @UseGuards(UserThrottlerGuard)
+  @Throttle({ default:  RATE_LIMIT.AUTH }) // Allow 5 requests per minute
   async register(
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
@@ -31,6 +36,8 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('login')
+  @UseGuards(UserThrottlerGuard)
+  @Throttle({ default:  RATE_LIMIT.AUTH }) // Allow 5 requests per minute
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -41,14 +48,18 @@ export class AuthController {
     return result;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @UseGuards(UserThrottlerGuard)
+  @Throttle({ default:  RATE_LIMIT.READ }) // Allow 30 requests per minute
   async getMe(@Req() request: { user: JwtPayload }) {
     return this.authService.getProfile(request.user.id);
   }
 
-  @HttpCode(200)
   @Post('logout')
+  @HttpCode(200)
+  @UseGuards(UserThrottlerGuard)
+  @Throttle({ default:  RATE_LIMIT.READ })
   logout(@Res({ passthrough: true }) response: Response) {
     response.clearCookie('accessToken', {
       path: '/',

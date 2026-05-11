@@ -13,14 +13,19 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../../entities/roles.enum';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { RegistrationsService } from './registrations.service';
+import { Throttle } from '@nestjs/throttler';
+import { UserThrottlerGuard } from '../../common/guards/user-throttler.guard';
+import { RATE_LIMIT } from '../../config/rate-limit.config';
 
 @Controller('registrations')
+@UseGuards(JwtAuthGuard, UserThrottlerGuard)
 export class RegistrationsController {
   constructor(private readonly registrationsService: RegistrationsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT)
+  @Throttle({ default:  RATE_LIMIT.WRITE }) // Giới hạn 10 request / 1 phút 
   async registerTicket(
     @Body() dto: CreateRegistrationDto,
     @Req() request: { user: { id: string } },
@@ -32,8 +37,9 @@ export class RegistrationsController {
   }
 
   @Get('confirm')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT)
+  @Throttle({ default:  RATE_LIMIT.READ }) // Giới hạn 30 request / 1 phút 
   async getMyConfirmedRegistrations(@Req() request: { user: { id: string } }) {
     return this.registrationsService.getMyConfirmedRegistrations(
       request.user.id,
@@ -41,15 +47,17 @@ export class RegistrationsController {
   }
 
   @Get('pending')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT)
+  @Throttle({ default:  RATE_LIMIT.READ }) // Giới hạn 30 request / 1 phút 
   async getMyPendingRegistrations(@Req() request: { user: { id: string } }) {
     return this.registrationsService.getMyPendingRegistrations(request.user.id);
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT)
+  @Throttle({ default:  RATE_LIMIT.READ }) // Giới hạn 30 request / 1 phút 
   async getRegistrationDetail(
     @Param('id') registrationId: string,
     @Req() request: { user: { id: string } },
