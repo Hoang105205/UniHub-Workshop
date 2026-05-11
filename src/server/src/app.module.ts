@@ -13,11 +13,14 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { bullConfig } from './config/bull.config';
 import { NotificationModule } from './modules/notification/notification.module';
 import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { getThrottlerConfig } from './config/throttler.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(databaseConfig),
+    ThrottlerModule.forRootAsync(getThrottlerConfig),
     BullModule.forRootAsync(bullConfig),
     EventEmitterModule.forRoot({ global: true }),
     NotificationModule,
