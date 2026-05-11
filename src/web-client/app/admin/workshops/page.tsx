@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, Suspense, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -94,7 +94,7 @@ function toUtcIso(value: string) {
   return new Date(value).toISOString();
 }
 
-export default function AdminWorkshopsPage() {
+function AdminWorkshopsContent() {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
   const [workshops, setWorkshops] = useState<WorkshopListItem[]>([]);
@@ -532,5 +532,13 @@ export default function AdminWorkshopsPage() {
         </section>
       </section>
     </main>
+  );
+}
+
+export default function AdminWorkshopsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-[#62625b]">Loading...</div>}>
+      <AdminWorkshopsContent />
+    </Suspense>
   );
 }
