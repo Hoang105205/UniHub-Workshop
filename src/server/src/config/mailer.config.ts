@@ -3,6 +3,16 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { join } from 'path';
 import { DynamicModule } from '@nestjs/common/interfaces/modules/dynamic-module.interface';
+import { existsSync } from 'fs';
+
+const resolveTemplateDir = () => {
+  const distTemplateDir = join(process.cwd(), 'dist', 'templates', 'email');
+  if (existsSync(distTemplateDir)) {
+    return distTemplateDir;
+  }
+
+  return join(process.cwd(), 'src', 'templates', 'email');
+};
 
 export const mailerConfig: DynamicModule = MailerModule.forRootAsync({
   imports: [ConfigModule],
@@ -23,7 +33,7 @@ export const mailerConfig: DynamicModule = MailerModule.forRootAsync({
         'Unihub Workshop <no-reply@example.com>',
     },
     template: {
-      dir: join(process.cwd(), 'src', 'templates', 'email'),
+      dir: resolveTemplateDir(),
       adapter: new HandlebarsAdapter(),
       options: {
         strict: true,
