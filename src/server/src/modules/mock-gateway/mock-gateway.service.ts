@@ -5,7 +5,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import {
   MOCK_GATEWAY_CONFIG_KEY,
@@ -44,7 +44,7 @@ export class MockGatewayService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.redis.set(MOCK_GATEWAY_CONFIG_KEY, record);
+    await this.redis.set(MOCK_GATEWAY_CONFIG_KEY, JSON.stringify(record));
     this.logger.log(
       `Mock gateway config updated: failureRate=${record.failureRate} latency=${record.latency}ms`,
     );
@@ -53,9 +53,8 @@ export class MockGatewayService {
   }
 
   async getConfig(): Promise<MockGatewayConfigView> {
-    const parsed = await this.redis.get<MockGatewayConfigRecord>(
-      MOCK_GATEWAY_CONFIG_KEY,
-    );
+    const raw = await this.redis.get(MOCK_GATEWAY_CONFIG_KEY);
+    const parsed = raw ? (JSON.parse(raw) as MockGatewayConfigRecord) : null;
 
     if (!parsed) {
       return {

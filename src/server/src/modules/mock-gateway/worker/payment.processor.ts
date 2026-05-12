@@ -3,7 +3,7 @@ import type { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Inject, Logger } from '@nestjs/common';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import { MockGatewayService } from '../mock-gateway.service';
 import { RedisCircuitBreakerService } from '../redis-circuit-breaker.service';
 import { Payment, PaymentStatus } from '../../../entities/payment.entity';
@@ -61,7 +61,7 @@ export class PaymentProcessor {
         transactionId: result.transactionId,
         status: 'SUCCESS',
       };
-      await this.redis.set(redisKey, finalResult, { ex: 86400 });
+      await this.redis.set(redisKey, JSON.stringify(finalResult), 'EX', 86400);
 
       this.logger.debug(
         `Đã hoàn tất quy trình thanh toán thành công cho ${dto.registrationId}`,
