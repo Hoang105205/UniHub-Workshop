@@ -14,7 +14,7 @@ import type {
   PaymentFailedEmailJob,
   TicketCancelledEmailJob,
 } from './email.types';
-import { INotificationChannel } from '../notification/notification-channel.interface';
+import { INotificationChannel } from '../../interfaces/notification-channel.interface';
 
 @Injectable()
 export class EmailChannelService implements INotificationChannel {

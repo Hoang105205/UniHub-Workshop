@@ -1,8 +1,8 @@
 // notification/notification-event.listener.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { INotificationChannel } from './notification-channel.interface';
-import { EmailChannelService } from '../email/email-channel.service';
+import { INotificationChannel } from './interfaces/notification-channel.interface';
+import { EmailChannelService } from './channels/email/email-channel.service';
 import {
   DOMAIN_EVENT_TICKET_CONFIRMED,
   DOMAIN_EVENT_PAYMENT_PENDING,
@@ -20,7 +20,7 @@ export class NotificationEventListener {
     // Tương lai: private readonly telegramChannel: TelegramChannelService
   ) {
     // Cắm phích các kênh vào ổ điện
-    this.channels = [this.emailChannel]; 
+    this.channels = [this.emailChannel];
   }
 
   @OnEvent(DOMAIN_EVENT_TICKET_CONFIRMED)
@@ -44,7 +44,10 @@ export class NotificationEventListener {
   }
 
   // Hàm loop qua tất cả các kênh (Fan-out)
-  private async dispatchToChannels(method: keyof INotificationChannel, payload: any) {
+  private async dispatchToChannels(
+    method: keyof INotificationChannel,
+    payload: any,
+  ) {
     for (const channel of this.channels) {
       try {
         if (typeof channel[method] === 'function') {
@@ -52,7 +55,10 @@ export class NotificationEventListener {
           await (channel[method] as any)(payload);
         }
       } catch (error) {
-        this.logger.error(`Channel [${channel.name}] failed to process ${method}`, error);
+        this.logger.error(
+          `Channel [${channel.name}] failed to process ${method}`,
+          error,
+        );
       }
     }
   }

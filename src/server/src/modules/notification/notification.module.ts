@@ -1,6 +1,6 @@
 // notification/notification.module.ts
 import { Module } from '@nestjs/common';
-import { EmailModule } from '../email/email.module';
+import { EmailModule } from './channels/email/email.module';
 import { NotificationEventListener } from './notification-event.listener';
 
 @Module({

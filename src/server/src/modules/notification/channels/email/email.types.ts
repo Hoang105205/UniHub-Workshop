@@ -1,9 +1,9 @@
-import { 
+import {
   TicketConfirmedNotificationJob,
   PaymentPendingNotificationJob,
   PaymentFailedNotificationJob,
-  TicketCancelledNotificationJob
-} from '../notification/notification.types';
+  TicketCancelledNotificationJob,
+} from '../../notification.types';
 
 export interface TicketConfirmedEmailJob extends TicketConfirmedNotificationJob {
   // cc?: string[];
