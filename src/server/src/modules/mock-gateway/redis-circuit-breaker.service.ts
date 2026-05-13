@@ -15,9 +15,9 @@ import {
   MOCK_GATEWAY_CIRCUIT_OPENED_AT_KEY,
   MOCK_GATEWAY_CIRCUIT_PROBE_LOCK_KEY,
   MOCK_GATEWAY_CIRCUIT_STATE_KEY,
-  MOCK_GATEWAY_REDIS_TOKEN,
   MockGatewayState,
 } from './mock-gateway.constants';
+import { REDIS_CLIENT_TOKEN } from '../../redis/redis.constants';
 
 type CircuitContext = {
   requestId: string;
@@ -29,9 +29,7 @@ type CircuitContext = {
 export class RedisCircuitBreakerService {
   private readonly logger = new Logger(RedisCircuitBreakerService.name);
 
-  constructor(
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
-  ) {}
+  constructor(@Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis) {}
 
   async execute<T>(action: () => Promise<T>): Promise<T> {
     const context = await this.beforeCall();

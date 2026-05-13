@@ -15,10 +15,10 @@ import { MockChargeDto } from '../dto/mock-charge.dto';
 import {
   MOCK_GATEWAY_QUEUE,
   MOCK_GATEWAY_JOB,
-  MOCK_GATEWAY_REDIS_TOKEN,
 } from '../mock-gateway.constants';
 import { generateQrCode } from '../../../utils/qr.utils';
 import { RegistrationsService } from '../../registrations/registrations.service';
+import { REDIS_CLIENT_TOKEN } from '../../../redis/redis.constants';
 
 @Processor(MOCK_GATEWAY_QUEUE)
 export class PaymentProcessor {
@@ -31,7 +31,7 @@ export class PaymentProcessor {
     private readonly dataSource: DataSource,
     @InjectRepository(Registration)
     private readonly registrationRepository: Repository<Registration>,
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
   ) {}
 
   @Process(MOCK_GATEWAY_JOB)

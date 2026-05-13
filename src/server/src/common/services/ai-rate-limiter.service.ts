@@ -1,15 +1,13 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
 import { AI_RATE_LIMIT } from '../../config/rate-limit.config';
+import { REDIS_CLIENT_TOKEN } from '../../redis/redis.constants';
 
 @Injectable()
 export class AiRateLimiterService implements OnModuleInit {
-  private readonly redisClient: Redis;
-
-  constructor() {
-    // Tái sử dụng kết nối ioredis qua biến môi trường
-    this.redisClient = new Redis(process.env.REDIS_URL as string);
-  }
+  constructor(
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redisClient: Redis,
+  ) {}
 
   // Hook này chạy 1 lần duy nhất khi Server NestJS vừa khởi động
   onModuleInit() {
@@ -68,16 +66,21 @@ export class AiRateLimiterService implements OnModuleInit {
     const now = Math.floor(Date.now() / 1000); // Unix timestamp (giây)
 
     // @ts-ignore - Bỏ qua cảnh báo type vì hàm này sinh ra động ở Runtime
-    const result = await this.redisClient.consumeTokenBucket(key, capacity, refillRate, now);
-    
+    const result = await this.redisClient.consumeTokenBucket(
+      key,
+      capacity,
+      refillRate,
+      now,
+    );
+
     const isAllowed = result[0] === 1; // 1 là Thành công, 0 là Bị chặn
-    const remaining = result[1];       // Số token còn lại trong xô
+    const remaining = result[1]; // Số token còn lại trong xô
 
     if (!isAllowed) {
       // Reject để Interceptor bắt lấy và throw 429
       return Promise.reject({ remainingPoints: remaining });
     }
-    
+
     // Resolve cho phép đi tiếp vào Controller
     return Promise.resolve({ remainingPoints: remaining });
   }

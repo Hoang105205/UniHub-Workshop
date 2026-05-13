@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import Redis from 'ioredis';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MOCK_GATEWAY_REDIS_TOKEN } from './mock-gateway.constants';
 import { MockGatewayController } from './mock-gateway.controller';
 import { MockGatewayConfigGuard } from './guards/mock-gateway.guard';
 import { IdempotencyInterceptor } from './guards/idempotency.interceptor';
@@ -32,20 +31,6 @@ import { ConfigService } from '@nestjs/config';
     IdempotencyInterceptor,
     PaymentQueueService,
     PaymentProcessor,
-    {
-      provide: MOCK_GATEWAY_REDIS_TOKEN,
-      useFactory: (configService: ConfigService): Redis => {
-        const redisUrl = configService.get<string>('REDIS_URL');
-
-        // Chặn đứng ngay lúc khởi động nếu quên set .env
-        if (!redisUrl) {
-          throw new Error('Thiếu biến môi trường REDIS_URL!');
-        }
-
-        return new Redis(redisUrl);
-      },
-      inject: [ConfigService],
-    },
   ],
   exports: [MockGatewayService, RedisCircuitBreakerService],
 })

@@ -9,13 +9,13 @@ import {
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import Redis from 'ioredis';
-import { MOCK_GATEWAY_REDIS_TOKEN } from '../mock-gateway.constants';
 import { RegistrationsService } from '../../registrations/registrations.service';
+import { REDIS_CLIENT_TOKEN } from '../../../redis/redis.constants';
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
   constructor(
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
     private readonly registrationsService: RegistrationsService,
   ) {}
 

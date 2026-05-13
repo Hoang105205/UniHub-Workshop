@@ -15,6 +15,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { getThrottlerConfig } from './config/throttler.config';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { getThrottlerConfig } from './config/throttler.config';
     RegistrationsModule,
     MockGatewayModule,
     WorkshopsModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

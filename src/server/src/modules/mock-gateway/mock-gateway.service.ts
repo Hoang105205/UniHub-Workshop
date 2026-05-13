@@ -11,11 +11,11 @@ import {
   MOCK_GATEWAY_CONFIG_KEY,
   MOCK_GATEWAY_DEFAULT_FAILURE_RATE,
   MOCK_GATEWAY_DEFAULT_LATENCY,
-  MOCK_GATEWAY_REDIS_TOKEN,
   MockGatewayConfigRecord,
 } from './mock-gateway.constants';
 import { ConfigMockGatewayDto } from './dto/config-mock-gateway.dto';
 import { MockChargeDto } from './dto/mock-charge.dto';
+import { REDIS_CLIENT_TOKEN } from '../../redis/redis.constants';
 
 export type MockGatewayConfigView = {
   failureRate: number;
@@ -33,9 +33,7 @@ export type MockGatewayChargeResponse = {
 export class MockGatewayService {
   private readonly logger = new Logger(MockGatewayService.name);
 
-  constructor(
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
-  ) {}
+  constructor(@Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis) {}
 
   async setConfig(dto: ConfigMockGatewayDto): Promise<MockGatewayConfigView> {
     const record: MockGatewayConfigRecord = {
