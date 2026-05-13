@@ -10,6 +10,8 @@ import { SupabaseStorageService } from './supabase-storage.service';
 import { WorkshopsController } from './workshops.controller';
 import { WorkshopsService } from './workshops.service';
 import { AI_SUMMARY_QUEUE } from './ai-summary.constants';
+import { AiRateLimiterService } from '../../common/services/ai-rate-limiter.service';
+import { AiRateLimitInterceptor } from './interceptors/ai-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { AI_SUMMARY_QUEUE } from './ai-summary.constants';
     AiSummaryQueueService,
     AiSummaryService,
     AiSummaryProcessor,
+    AiRateLimiterService,
+    AiRateLimitInterceptor,
   ],
 })
 export class WorkshopsModule {}
