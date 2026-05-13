@@ -85,7 +85,7 @@ export class RegistrationsService {
   ) {}
 
   async cancelPendingRegistration(registrationId: string): Promise<void> {
-    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       const registrationRepository = manager.getRepository(Registration);
       const paymentRepository = manager.getRepository(Payment);
       const workshopRepository = manager.getRepository(Workshop);
@@ -159,86 +159,82 @@ export class RegistrationsService {
     userId: string,
     workshopId: string,
   ): Promise<RegisterTicketResponse> {
-    const result = await this.dataSource.transaction(
-      'SERIALIZABLE',
-      async (manager) => {
-        const workshopRepository = manager.getRepository(Workshop);
-        const registrationRepository = manager.getRepository(Registration);
-        const paymentRepository = manager.getRepository(Payment);
+    const result = await this.dataSource.transaction(async (manager) => {
+      const workshopRepository = manager.getRepository(Workshop);
+      const registrationRepository = manager.getRepository(Registration);
+      const paymentRepository = manager.getRepository(Payment);
 
-        const workshop = await this.getWorkshopForUpdate(
-          workshopRepository,
-          workshopId,
-        );
+      const workshop = await this.getWorkshopForUpdate(
+        workshopRepository,
+        workshopId,
+      );
 
-        this.assertWorkshopOpen(workshop);
-        this.assertCapacityAvailable(workshop);
-        await this.assertNotRegistered(
-          registrationRepository,
-          workshopId,
-          userId,
-        );
+      this.assertWorkshopOpen(workshop);
+      this.assertCapacityAvailable(workshop);
+      await this.assertNotRegistered(
+        registrationRepository,
+        workshopId,
+        userId,
+      );
 
-        const isPaid = Number(workshop.price) > 0;
+      const isPaid = Number(workshop.price) > 0;
 
-        if (!isPaid) {
-          const registration = registrationRepository.create({
-            workshopId,
-            userId,
-            status: RegistrationStatus.CONFIRMED,
-            qrCode: generateQrCode(),
-          });
-
-          const savedRegistration =
-            await registrationRepository.save(registration);
-
-          workshop.registeredCount += 1;
-          await workshopRepository.save(workshop);
-
-          return {
-            id: savedRegistration.id,
-            workshopId: savedRegistration.workshopId,
-            userId: savedRegistration.userId,
-            status: savedRegistration.status,
-            qrCode: savedRegistration.qrCode,
-            registeredAt: savedRegistration.registeredAt,
-            workshop: {
-              title: workshop.title,
-              startTime: workshop.startTime,
-            },
-          };
-        }
-
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      if (!isPaid) {
         const registration = registrationRepository.create({
           workshopId,
           userId,
-          status: RegistrationStatus.PENDING,
-          expiresAt,
+          status: RegistrationStatus.CONFIRMED,
+          qrCode: generateQrCode(),
         });
 
         const savedRegistration =
           await registrationRepository.save(registration);
-
-        const payment = paymentRepository.create({
-          registrationId: savedRegistration.id,
-          status: PaymentStatus.PENDING,
-        });
-
-        const savedPayment = await paymentRepository.save(payment);
 
         workshop.registeredCount += 1;
         await workshopRepository.save(workshop);
 
         return {
           id: savedRegistration.id,
+          workshopId: savedRegistration.workshopId,
+          userId: savedRegistration.userId,
           status: savedRegistration.status,
-          paymentId: savedPayment.id,
-          expiresAt: savedRegistration.expiresAt as Date,
-          message: 'Registration created. Please proceed to pay or cancel.',
+          qrCode: savedRegistration.qrCode,
+          registeredAt: savedRegistration.registeredAt,
+          workshop: {
+            title: workshop.title,
+            startTime: workshop.startTime,
+          },
         };
-      },
-    );
+      }
+
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const registration = registrationRepository.create({
+        workshopId,
+        userId,
+        status: RegistrationStatus.PENDING,
+        expiresAt,
+      });
+
+      const savedRegistration = await registrationRepository.save(registration);
+
+      const payment = paymentRepository.create({
+        registrationId: savedRegistration.id,
+        status: PaymentStatus.PENDING,
+      });
+
+      const savedPayment = await paymentRepository.save(payment);
+
+      workshop.registeredCount += 1;
+      await workshopRepository.save(workshop);
+
+      return {
+        id: savedRegistration.id,
+        status: savedRegistration.status,
+        paymentId: savedPayment.id,
+        expiresAt: savedRegistration.expiresAt as Date,
+        message: 'Registration created. Please proceed to pay or cancel.',
+      };
+    });
 
     if ('qrCode' in result) {
       await this.emitTicketConfirmed(result.id);
@@ -257,7 +253,7 @@ export class RegistrationsService {
     transactionId: string,
   ): Promise<void> {
     // Đảm bảo tính ACID bằng Transaction
-    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       // 1. Cập nhật bảng Payment
       await manager.update(
         Payment,
@@ -297,7 +293,7 @@ export class RegistrationsService {
   }
 
   async handleSystemFailure(registrationId: string): Promise<void> {
-    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       const registrationRepo = manager.getRepository(Registration);
       const paymentRepo = manager.getRepository(Payment);
       const workshopRepo = manager.getRepository(Workshop);
@@ -418,7 +414,7 @@ export class RegistrationsService {
     registrationId: string,
     idempotencyKey: string,
   ): Promise<void> {
-    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       const paymentRepository = manager.getRepository(Payment);
 
       const payment = await paymentRepository.findOne({
@@ -604,7 +600,9 @@ export class RegistrationsService {
     };
   }
 
-  private mapWorkshopEmailContext(workshop: Workshop): WorkshopNotificationContext {
+  private mapWorkshopEmailContext(
+    workshop: Workshop,
+  ): WorkshopNotificationContext {
     return {
       title: workshop.title,
       startTime: workshop.startTime,
