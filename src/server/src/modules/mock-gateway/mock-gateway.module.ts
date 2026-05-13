@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MOCK_GATEWAY_REDIS_TOKEN } from './mock-gateway.constants';
 import { MockGatewayController } from './mock-gateway.controller';
 import { MockGatewayConfigGuard } from './guards/mock-gateway.guard';
+import { IdempotencyInterceptor } from './guards/idempotency.interceptor';
 import { MockGatewayService } from './mock-gateway.service';
 import { RedisCircuitBreakerService } from './redis-circuit-breaker.service';
 import { MOCK_GATEWAY_QUEUE } from './mock-gateway.constants';
@@ -28,13 +29,14 @@ import { ConfigService } from '@nestjs/config';
     MockGatewayService,
     RedisCircuitBreakerService,
     MockGatewayConfigGuard,
+    IdempotencyInterceptor,
     PaymentQueueService,
     PaymentProcessor,
     {
       provide: MOCK_GATEWAY_REDIS_TOKEN,
       useFactory: (configService: ConfigService): Redis => {
         const redisUrl = configService.get<string>('REDIS_URL');
-        
+
         // Chặn đứng ngay lúc khởi động nếu quên set .env
         if (!redisUrl) {
           throw new Error('Thiếu biến môi trường REDIS_URL!');

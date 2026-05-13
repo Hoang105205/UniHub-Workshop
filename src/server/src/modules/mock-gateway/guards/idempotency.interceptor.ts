@@ -10,11 +10,13 @@ import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import Redis from 'ioredis';
 import { MOCK_GATEWAY_REDIS_TOKEN } from '../mock-gateway.constants';
+import { RegistrationsService } from '../../registrations/registrations.service';
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
   constructor(
     @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
+    private readonly registrationsService: RegistrationsService,
   ) {}
 
   async intercept(
@@ -46,7 +48,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
       return of(parsedState);
     }
 
-    // BƯỚC 3: Chưa có -> Đánh dấu đang xử lý
+    await this.registrationsService.validateForPayment(
+      request.body.registrationId,
+    );
+
+    // BƯỚC 3: Chưa có -> Đánh dấu đang xử lý sau khi đã xác thực hợp lệ
     // Dùng nx (Not eXists) để khóa chống race condition nếu client bắn 2 request cùng lúc
     const lockAcquired = await this.redis.set(
       redisKey,
