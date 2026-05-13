@@ -24,3 +24,8 @@ export const RATE_LIMIT = {
     ttl: 60000,
   },
 };
+
+export const AI_RATE_LIMIT = {
+  capacity: 5, // Sức chứa tối đa của xô: 5 tokens (burst)
+  refillRate: 60 * 30, // Cứ mỗi 30 phút nhỏ giọt thêm 1 token
+};
