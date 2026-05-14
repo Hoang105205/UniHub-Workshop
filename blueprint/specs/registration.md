@@ -2,12 +2,11 @@
 
 ## Mô tả
 
-Luồng đăng ký workshop với cơ chế **Pessimistic Locking** để đảm bảo **0% oversell** khi có 12,000 users đăng ký đồng thời. Hệ thống xử lý cả workshop miễn phí và có phí, tích hợp với payment gateway. 
+Luồng đăng ký workshop với cơ chế **Pessimistic Locking** để đảm bảo **0% oversell** khi có 12.000 users đăng ký đồng thời. Hệ thống xử lý cả workshop miễn phí và có phí, tích hợp với payment gateway.
 
 **Mục tiêu:**
-
 - Đảm bảo không có 2 sinh viên cùng nhận "chỗ cuối cùng"
-- Xử lý 12,000 concurrent requests trong 10 phút
+- Xử lý 12.000 concurrent requests trong 10 phút
 - Response time < 500ms (P95) cho registration request
 - Rollback tự động khi payment failed
 
@@ -22,115 +21,32 @@ Luồng đăng ký workshop với cơ chế **Pessimistic Locking** để đảm
 **Actor:** Student
 
 **Precondition:**
-
 - User đã login
 - Thời gian đăng ký còn mở
 - Workshop có chỗ trống
 
 **Flow:**
-
-```
-1. Student POST /registrations
-   Headers: { Authorization: Bearer <token> }
-   Body: {
-     "workshopId": "uuid"
-   }
-
-2. Backend validation:
-   a. Extract user từ JWT
-   b. Validate DTO: workshopId is valid UUID
-
-3. BEGIN TRANSACTION (Isolation: SERIALIZABLE)
-
-4. LOCK workshop row (CRITICAL):
-   workshop = SELECT * FROM workshops
-              WHERE id = $1
-              FOR UPDATE;  // Pessimistic lock!
-
-   // Các transaction khác đọc cùng row này phải đợi
-   // lock được release (COMMIT hoặc ROLLBACK)
-
-5. Business validation:
-   a. Check workshop exists:
-      IF !workshop THEN
-        ROLLBACK;
-        → 404 Not Found "Workshop not found"
-
-   b. Check workshop timeline:
-      IF workshop.start_time <= NOW() OR workshop.end_time <= NOW() THEN
-        ROLLBACK;
-        → 400 Bad Request "Workshop not open for registration"
-
-   c. Check capacity:
-      IF workshop.registered_count >= workshop.capacity THEN
-        ROLLBACK;
-        → 409 Conflict "Workshop is full"
-
-   d. Check duplicate registration:
-      existing = SELECT * FROM registrations
-                 WHERE workshop_id = $1 AND user_id = $2
-
-      IF existing THEN
-        ROLLBACK;
-        → 409 Conflict "Already registered for this workshop"
-
-6. Create registration:
-   qrCode = generateQRCode();  // "WS-{timestamp}-{random}"
-
-   INSERT INTO registrations (
-     workshop_id,
-     user_id,
-     status,
-     qr_code,
-     registered_at
-   ) VALUES (
-     $workshopId,
-     $userId,
-     'confirmed',  // Miễn phí → confirmed ngay
-     $qrCode,
-     NOW()
-   )
-   RETURNING *;
-
-7. Increment registered_count (ATOMIC):
-   UPDATE workshops
-   SET registered_count = registered_count + 1,
-       updated_at = NOW()
-   WHERE id = $workshopId;
-
-8. COMMIT TRANSACTION
-   // Lock được release tại đây
-
-9. Queue notification job (async, outside transaction):
-   await notificationQueue.add('registration-confirmed', {
-     userId: $userId,
-     workshopId: $workshopId,
-     qrCode: $qrCode
-   }, {
-     priority: 10  // High priority
-   });
-
-10. Invalidate cache:
-    await redis.del(`workshop:${workshopId}:seats`);
-
-11. Response 201 Created:
-    {
-      "id": "uuid",
-      "workshopId": "uuid",
-      "userId": "uuid",
-      "status": "confirmed",
-      "qrCode": "WS-1234567890-a1b2c3d4",
-      "registeredAt": "2024-06-01T10:30:00Z",
-      "workshop": {
-        "title": "React Best Practices",
-        "startTime": "2024-06-05T09:00:00Z"
-      }
-    }
-```
+1. Student gửi POST `/registrations` với workshopId
+2. Backend validate:
+   - Kiểm tra JWT token
+   - Validate workshopId là UUID hợp lệ
+3. Bắt đầu transaction với isolation level SERIALIZABLE
+4. Khóa row workshop bằng `FOR UPDATE` (pessimistic lock)
+5. Kiểm tra điều kiện kinh doanh:
+   - Workshop có tồn tại
+   - Thời gian đăng ký còn mở (start_time > NOW)
+   - Có chỗ trống (registered_count < capacity)
+   - User chưa đăng ký workshop này
+6. Tạo registration record với status = 'confirmed'
+7. Tạo QR code duy nhất (định dạng: WS-{timestamp}-{random-hex})
+8. Tăng registered_count của workshop
+9. Commit transaction
+10. Đẩy job notification vào queue (async)
+11. Xóa cache workshop
+12. Trả về HTTP 201 Created với thông tin registration
 
 **Postcondition:**
-
-- Registration created với status = 'confirmed'
+- Registration được tạo với status = 'confirmed'
 - Workshop.registered_count tăng 1
 - Email + in-app notification được queue
 - QR code unique và valid
@@ -142,72 +58,30 @@ Luồng đăng ký workshop với cơ chế **Pessimistic Locking** để đảm
 **Actor:** Student
 
 **Precondition:**
-
 - User đã login
 - Workshop có price > 0
 - Workshop có chỗ trống
 - Payment gateway hoạt động (hoặc Circuit breaker CLOSED)
 
 **Flow:**
-
-```
-1. Student POST /registrations
-   Body: {
-     "workshopId": "uuid",
-     "paymentMethod": "mock_gateway",
-     "idempotencyKey": "client-generated-uuid"  // REQUIRED!
-   }
-
-2. Validation (same as free workshop)
-
-3. BEGIN TRANSACTION (SERIALIZABLE)
-
-4. LOCK workshop row:
-   workshop = SELECT * FROM workshops WHERE id = $1 FOR UPDATE;
-
-5. Business validation (same as free workshop)
-
-6. Create registration với status = 'pending':
-   registration = INSERT INTO registrations (
-     workshop_id,
-     user_id,
-     status,  // 'pending' - chờ người dùng quyết định Pay hoặc Cancel
-     qr_code,
-     registered_at
-   ) VALUES (...) RETURNING *;
-
-7. Create payment record:
-   payment = INSERT INTO payments (
-     registration_id,
-     amount,
-     idempotency_key,  // CRITICAL: chống double charge
-     status,           // 'pending'
-     payment_gateway
-   ) VALUES (...) RETURNING *;
-
-8. Increment registered_count:
-   UPDATE workshops
-   SET registered_count = registered_count + 1
-   WHERE id = $workshopId;
-
-9. COMMIT TRANSACTION
-   // Lock released, seat đã được reserve
-
-10. Response 201 Created:
-    {
-    "id": "uuid",
-    "status": "pending",
-    "message": "Registration created. Please proceed to pay or cancel.",
-    "paymentId": "uuid",
-    "expiresAt": "2024-06-01T08:15:00Z" // Có thể set timeout 10p để giữ chỗ
-    }
-```
+1. Student gửi POST `/registrations` với workshopId, paymentMethod, idempotencyKey
+2. Validation (tương tự free workshop)
+3. Bắt đầu transaction SERIALIZABLE
+4. Khóa workshop row với FOR UPDATE
+5. Kiểm tra điều kiện kinh doanh (tương tự free workshop)
+6. Tạo registration với status = 'pending' (chờ thanh toán)
+7. Tạo payment record với status = 'pending'
+8. Tăng registered_count (seat được reserve)
+9. Commit transaction
+10. Trả về HTTP 201 Created
+    - Status: "pending"
+    - Message: "Registration created. Please proceed to pay or cancel."
+    - Payment expires in 10 minutes
 
 **Postcondition:**
-
 - Seat được reserve
 - Registration ở trạng thái 'pending'
-- Chờ người dùng bấm "Pay" hoặc "Cancel" trên giao diện
+- Chờ người dùng bấm "Pay" hoặc "Cancel"
 
 ---
 
@@ -216,183 +90,60 @@ Luồng đăng ký workshop với cơ chế **Pessimistic Locking** để đảm
 **Actor:** Student
 
 **Precondition:**
-
 - Registration đang ở trạng thái 'pending'
 - Payment gateway hoạt động (hoặc Circuit breaker CLOSED)
 
 **Flow:**
-
-```
-1. Student POST /registrations/:id/pay
-Body: {
-"paymentMethod": "mock_gateway",
-"idempotencyKey": "client-generated-uuid"  // REQUIRED! CRITICAL: chống double charge
-}
-
+1. Student gửi POST `/registrations/:id/pay` với paymentMethod, idempotencyKey
 2. Validate:
-registration = SELECT * FROM registrations WHERE id = ?
-IF registration.status != 'pending' THEN
-→ 400 Bad Request "Registration is not in pending state"
-
-3. Fetch payment record:
-payment = SELECT * FROM payments WHERE registration_id = ?
-
-4. Process payment (OUTSIDE transaction, qua Circuit Breaker):
-try {
-    paymentResult = await circuitBreaker.call(
-        () => paymentGateway.charge({
-            amount: payment.amount,
-            currency: 'VND',
-            idempotencyKey: body.idempotencyKey,
-            metadata: {
-                registrationId: registration.id,
-                workshopId: registration.workshop_id
-            }
-        }),
-        'payment_gateway'
-    );
-
-// Payment success
-a. Update payment:
-UPDATE payments
-SET status = 'success',
-transaction_id = $paymentResult.id,
-updated_at = NOW()
-WHERE id = $payment.id;
-
-b. Update registration:
-UPDATE registrations
-SET status = 'confirmed',
-payment_id = $payment.id
-WHERE id = $registration.id;
-
-c. Queue notification:
-await notificationQueue.add('registration-confirmed', {...});
-
-} catch (error) {
-if (error instanceof ServiceUnavailableException) {
-    // Circuit breaker OPEN → Graceful degradation
-
-    a. Registration giữ status = 'pending'
-    b. Queue retry job:
-        await paymentQueue.add('retry-payment', {
-        paymentId: payment.id
-        }, {
-        delay: 60000,  // 1 phút
-        attempts: 5,
-        backoff: { type: 'exponential', delay: 60000 }
-        });
-
-    c. Return response với status = 'pending':
-        {
-        "id": "uuid",
-        "status": "pending",
-        "message": "Payment system is busy. We will process it shortly.",
-        "qrCode": null  // Chưa có QR
-        }
-
-    d. Send email:
-        "Hệ thống thanh toán đang bận. Giao dịch đang xử lý.
-        Bạn sẽ nhận QR code khi thanh toán hoàn tất."
-    }
-} else {
-// Payment failed (card declined, insufficient funds, etc.)
-    a. BEGIN TRANSACTION;
-    b. Update payment: SET status = 'failed', error_message = ?
-    c. Update registration:
-        UPDATE registrations SET status = 'cancelled' WHERE id = ?;
-    d. Decrement count:
-        UPDATE workshops
-        SET registered_count = registered_count - 1
-        WHERE id = ?;
-    e. COMMIT;
-
-    f. Response 402 Payment Required:
-        {
-        "statusCode": 402,
-        "message": "Payment failed: " + error.message,
-        "error": "Payment Required"
-        }
-}
-
-5. Response 200 OK (nếu payment success):
-{
-    "id": "uuid",
-    "status": "confirmed",
-    "qrCode": "WS-1234567890-a1b2c3d4",
-    "payment": {
-        "id": "uuid",
-        "amount": 50000,
-        "status": "success",
-        "transactionId": "ch_abc123"
-    }
-}
-```
-
-**Postcondition (success):**
-
-- Registration confirmed
-- Payment success
-- Seat giữ nguyên trạng thái reserve
-- QR code valid
-
-**Postcondition (failed):**
-
-- Seat được release
-- Registration bị hủy
+   - Registration có status = 'pending'
+   - Payment timeout chưa hết (< 10 phút)
+3. Gọi payment gateway qua Circuit Breaker (ngoài transaction)
+4. **Nếu payment SUCCESS:**
+   - Update payment: status = 'success', transaction_id được lưu
+   - Update registration: status = 'confirmed'
+   - Đẩy notification job
+   - Trả về HTTP 200 OK với QR code
+5. **Nếu Circuit Breaker OPEN (gateway sập):**
+   - Giữ registration status = 'pending'
+   - Đẩy retry job vào queue với exponential backoff
+   - Trả về HTTP 202 Accepted
+   - Message: "Payment system is busy. We will process it shortly."
+   - Gửi email: "Thanh toán đang xử lý, bạn sẽ nhận QR code khi hoàn tất"
+6. **Nếu payment FAILED (card declined, insufficient funds):**
+   - Bắt đầu transaction
+   - Update payment: status = 'failed', error_message được lưu
+   - Update registration: status = 'cancelled'
+   - Giảm registered_count (release seat)
+   - Commit
+   - Trả về HTTP 402 Payment Required
+   - Message: "Payment failed: {error message}"
+   - User có thể retry với card khác
 
 ---
 
 ### 3. Hủy đăng ký (Cancel)
 
-**Actor:** Student (hủy của mình) với trạng thái 'pending" only
+**Actor:** Student (hủy của mình)
+
+**Precondition:**
+- Registration có status = 'pending'
+- Còn ít nhất 24 giờ trước khi workshop bắt đầu
 
 **Flow:**
-
-```
-
-1. DELETE /registrations/:id
-
-2. Check ownership:
-   registration = SELECT \* FROM registrations WHERE id = ?
-
-   IF currentUser.role == 'student' AND registration.user_id != currentUser.id THEN
-   → 403 Forbidden
-
-3. Check cancellation policy:
-   workshopStartTime = registration.workshop.start_time
-   hoursUntilStart = (workshopStartTime - NOW()) / 3600
-
-   IF hoursUntilStart < 24 THEN
-   → 400 Bad Request "Cannot cancel within 24 hours of workshop"
-
-   IF registration.status != 'pending' THEN
-    → 400 Bad Request "Only pending registrations can be cancelled"
-
-4. BEGIN TRANSACTION
-
-5. Update registration:
-   UPDATE registrations SET status = 'cancelled' WHERE id = ?;
-
-6. Update payment (if exists):
-   UPDATE payments SET status = 'failed' WHERE registration_id = ?;
-
-7. Decrement count:
-   UPDATE workshops
-   SET registered_count = registered_count - 1
-   WHERE id = ?;
-
-8. COMMIT
-
-9. Queue notification:
-   await notificationQueue.add('registration-cancelled', {
-   userId: registration.user_id,
-   workshopId: registration.workshop_id
-   });
-
-10. Response 204 No Content
-
-```
+1. Student gửi DELETE `/registrations/:id`
+2. Kiểm tra ownership: user_id của registration phải trùng current user
+3. Kiểm tra chính sách hủy:
+   - Tính giờ = (workshop.start_time - NOW) / 3600
+   - Nếu < 24 giờ → Trả lỗi 400 Bad Request "Cannot cancel within 24 hours"
+   - Nếu status != 'pending' → Trả lỗi 400 "Only pending registrations can be cancelled"
+4. Bắt đầu transaction
+5. Update registration: status = 'cancelled'
+6. Update payment (nếu có): status = 'failed'
+7. Giảm workshop.registered_count
+8. Commit
+9. Đẩy notification job (cancellation)
+10. Trả về HTTP 204 No Content
 
 ---
 
@@ -400,212 +151,71 @@ if (error instanceof ServiceUnavailableException) {
 
 ### So sánh với Optimistic Locking
 
-| Approach             | Pessimistic (FOR UPDATE)                    | Optimistic (Version Check)             |
-| -------------------- | ------------------------------------------- | -------------------------------------- |
-| **Cơ chế**           | Lock row trước, xử lý tuần tự               | Đọc → Xử lý → Check version khi save   |
-| **Conflict rate**    | 0% (serialized)                             | Cao khi concurrent requests nhiều      |
-| **Retry needed**     | Không                                       | Có (client phải retry khi conflict)    |
-| **Throughput**       | Thấp hơn (do lock)                          | Cao hơn (no lock)                      |
-| **User experience**  | Deterministic (đợi lâu hơn nhưng chắc chắn) | Unpredictable (có thể retry nhiều lần) |
-| **Data consistency** | 100%                                        | Phụ thuộc retry logic                  |
+| Approach             | Pessimistic (FOR UPDATE)            | Optimistic (Version Check)       |
+| -------------------- | ----------------------------------- | -------------------------------- |
+| **Cơ chế**           | Lock row trước, xử lý tuần tự        | Đọc → Xử lý → Check version lúc save |
+| **Conflict rate**    | 0% (serialized)                     | Cao khi concurrent nhiều          |
+| **Retry needed**     | Không                               | Có (client phải retry)            |
+| **Throughput**       | Thấp hơn (do lock)                  | Cao hơn (no lock)                 |
+| **User experience**  | Deterministic (đợi lâu hơn nhưng chắc) | Unpredictable (có thể retry nhiều) |
+| **Data consistency** | 100% (không bao giờ oversell)       | Phụ thuộc vào retry logic         |
 
-### Kịch bản 100 users đăng ký cùng lúc workshop 60 chỗ
+### Kết luận
 
-**Với Pessimistic Locking:**
-
-```
-
-Request 1: LOCK → Check (count=0) → Insert → UPDATE count=1 → COMMIT (50ms)
-Request 2: WAIT → Check (count=1) → Insert → UPDATE count=2 → COMMIT (50ms)
-Request 3: WAIT → Check (count=2) → Insert → UPDATE count=3 → COMMIT (50ms)
-...
-Request 60: WAIT → Check (count=59) → Insert → UPDATE count=60 → COMMIT (50ms)
-Request 61: WAIT → Check (count=60 >= 60) → ROLLBACK "Full" (10ms)
-...
-Request 100: WAIT → ROLLBACK "Full" (10ms)
-
-Result: 60 success, 40 fail (đúng)
-Average response time: ~1.5s (chấp nhận được)
-
-```
-
-**Với Optimistic Locking:**
-
-```
-
-Request 1: Read (count=0, version=1) → Insert → UPDATE count=1, version=2 → OK
-Request 2: Read (count=0, version=1) → Insert → UPDATE failed (version changed) → RETRY
-Request 3: Read (count=0, version=1) → Insert → UPDATE failed → RETRY
-...
-Request 60: Read + RETRY nhiều lần → Eventually OK
-Request 61: Read (count=60) → Should fail BUT: - Có thể đọc count=59 (race condition) - Insert → Oversell!
-
-Result: 65 success, 35 fail (OVERSOLD 5 chỗ!)
-User experience: Nhiều người retry 5-10 lần, frustrated
-
-```
-
-### Kết luận: Pessimistic Locking phù hợp cho bài toán này
-
-**Lý do:**
-
-1. **Correctness > Performance** - Oversell là lỗi nghiêm trọng, chấp nhận throughput thấp
-2. **Đọc ít, ghi nhiều** - Spike đăng ký 3 phút đầu, không phải load đọc liên tục
-3. **Connection pool đủ lớn** - Có thể handle 100 concurrent locks (pool size = 50-100)
+Pessimistic Locking là chọn đúng vì:
+1. **Correctness > Performance** - Oversell là lỗi nghiêm trọng
+2. **Đọc ít, ghi nhiều** - Spike 3 phút đầu, không phải load đọc liên tục
+3. **Connection pool đủ lớn** - Có thể handle 100 concurrent locks
 
 ---
 
 ## Kịch bản lỗi
 
 ### 1. Workshop đã full
-
-**Trigger:** registered_count >= capacity
-
-**Response:**
-
-```json
-{
-  "statusCode": 409,
-  "message": "Workshop 'React Best Practices' is full (60/60 seats)",
-  "error": "Conflict"
-}
-```
-
-**Action:** User chọn workshop khác hoặc join waitlist (future feature)
-
----
+- **Trigger:** registered_count >= capacity
+- **Response:** HTTP 409 Conflict - "Workshop 'React Best Practices' is full (60/60 seats)"
+- **Action:** User chọn workshop khác
 
 ### 2. Đã đăng ký workshop này rồi
-
-**Trigger:** Duplicate (workshop_id, user_id)
-
-**Response:**
-
-```json
-{
-  "statusCode": 409,
-  "message": "You have already registered for this workshop",
-  "error": "Conflict",
-  "existingRegistration": {
-    "id": "uuid",
-    "status": "confirmed",
-    "qrCode": "WS-..."
-  }
-}
-```
-
-**Action:** Hiển thị QR code hiện tại
-
----
+- **Trigger:** Duplicate (workshop_id, user_id)
+- **Response:** HTTP 409 Conflict - "You have already registered for this workshop"
+- **Existing Registration:** Trả về thông tin đăng ký hiện tại (id, status, qrCode)
+- **Action:** Hiển thị QR code hiện tại
 
 ### 3. Payment gateway timeout
-
-**Trigger:** Payment request > 10s
-
-**Response:**
-
-```json
-{
-  "statusCode": 201,
-  "message": "Registration saved. Payment processing...",
-  "registration": {
-    "id": "uuid",
-    "status": "pending",
-    "qrCode": null
-  }
-}
-```
-
-**Background:**
-
-- Retry payment job chạy sau 1 phút
-- Email: "Đăng ký thành công, thanh toán đang xử lý"
-- Nếu sau 5 retries vẫn fail → Email "Vui lòng thanh toán thủ công"
-
----
+- **Trigger:** Payment request > 10 giây
+- **Response:** HTTP 202 Accepted
+  - Status: "pending"
+  - Message: "Registration saved. Payment processing..."
+- **Background:** Retry job chạy sau 1 phút với backoff exponential
+- **Email:** "Đăng ký thành công, thanh toán đang xử lý"
 
 ### 4. Circuit breaker OPEN
-
-**Trigger:** Payment gateway down (5 lỗi liên tiếp)
-
-**Response:** (same as timeout)
-
-**Backend:**
-
-- Tất cả payment requests fail fast (không gọi gateway)
-- Registration vẫn được tạo với status = 'pending'
-- Retry jobs sẽ chạy khi circuit HALF_OPEN
-
----
+- **Trigger:** > 5 lỗi trong 60 giây
+- **Response:** HTTP 503 Service Unavailable
+- **Backend:** Tất cả payment requests fail fast
+- **Registration:** Vẫn được tạo với status = 'pending'
+- **Retry:** Jobs sẽ chạy khi circuit HALF_OPEN (sau 30s)
 
 ### 5. Card declined
-
-**Trigger:** Insufficient funds, expired card, etc.
-
-**Response:**
-
-```json
-{
-  "statusCode": 402,
-  "message": "Payment failed: Card declined",
-  "error": "Payment Required"
-}
-```
-
-**Backend:**
-
-- Registration bị xóa
-- Seat được release
-- User có thể retry với card khác
-
----
+- **Trigger:** Insufficient funds, card expired, etc.
+- **Response:** HTTP 402 Payment Required - "Payment failed: Card declined"
+- **Backend:** Đánh dấu payment là failed, xóa registration, giảm count
+- **Action:** User retry với card khác
 
 ### 6. Lock timeout
+- **Trigger:** Transaction giữ lock > 5 giây (PostgreSQL timeout)
+- **Response:** HTTP 500 Internal Server Error - "Registration timeout. Please try again."
+- **Action:** Client auto-retry sau 2 giây
 
-**Trigger:** Transaction hold lock > 5 seconds
-
-**PostgreSQL config:**
-
-```sql
-SET lock_timeout = '5s';
-```
-
-**Response:**
-
-```json
-{
-  "statusCode": 500,
-  "message": "Registration timeout. Please try again.",
-  "error": "Internal Server Error"
-}
-```
-
-**Action:** Client auto retry sau 2 giây
-
----
-
-### 7. Idempotent retry (client retry với same idempotency key)
-
-**Trigger:** Client timeout → Retry với cùng idempotency key
-
-**Flow:**
-
-```
-1. Check cache:
-   cached = await redis.get(`idempotency:${key}`);
-   IF cached THEN
-     return JSON.parse(cached);  // Same response
-
-2. Check DB:
-   payment = SELECT * FROM payments WHERE idempotency_key = ?
-   IF payment THEN
-     registration = SELECT * FROM registrations WHERE id = payment.registration_id
-     return registration;  // Same response
-
-3. Proceed with new registration (key chưa dùng)
-```
-
-**Result:** Client nhận cùng response, không bị charge 2 lần
+### 7. Idempotent retry (same idempotency key)
+- **Trigger:** Client timeout → Retry với cùng idempotency key
+- **Flow:**
+  1. Kiểm tra cache trước (Redis)
+  2. Kiểm tra database (payment table)
+  3. Nếu đã xử lý → Trả cùng response
+  4. Không bị charge 2 lần
+- **Result:** Deterministic response, no double charge
 
 ---
 
@@ -613,24 +223,25 @@ SET lock_timeout = '5s';
 
 ### Business Rules
 
-| Ràng buộc                               | Giá trị                                             |
-| --------------------------------------- | --------------------------------------------------- |
-| Max registrations per user per workshop | 1                                                   |
-| Cancellation deadline                   | 24 hours before workshop                            |
-| QR code format                          | `WS-{timestamp}-{8-char-hex}`                       |
-| QR code uniqueness                      | Global unique                                       |
-| Payment retry attempts                  | 5                                                   |
-| Payment retry delay                     | Exponential backoff (1min, 2min, 4min, 8min, 16min) |
+| Ràng buộc                               | Giá trị                                     |
+| --------------------------------------- | ------------------------------------------- |
+| Max registrations per user per workshop | 1                                           |
+| Cancellation deadline                   | 24 hours before workshop start              |
+| QR code format                          | `WS-{timestamp}-{8-char-hex}`               |
+| QR code uniqueness                      | Global unique, UNIQUE constraint ở DB       |
+| Payment timeout                         | 10 minutes                                  |
+| Payment retry attempts                  | 5                                           |
+| Payment retry delay                     | Exponential backoff (5s, 10s, 20s, 40s, 80s) |
 
 ### Performance
 
 | Ràng buộc                         | Giá trị                     |
 | --------------------------------- | --------------------------- |
 | Registration response time (free) | < 500ms (P95)               |
-| Registration response time (paid) | < 2s (P95, include payment) |
+| Registration response time (paid) | < 2s (P95)                  |
 | Concurrent registrations          | 12,000 in 10 minutes        |
 | Lock hold time                    | < 100ms average             |
-| Transaction timeout               | 5s                          |
+| Transaction timeout               | 5 seconds                   |
 | Database connection pool          | 50-100 connections          |
 
 ### Data Integrity
@@ -674,60 +285,205 @@ SET lock_timeout = '5s';
 
 ---
 
-## Implementation Notes
+## Luồng chính
 
-### QR Code Generation
+### 1. Đăng ký Workshop Miễn phí
 
-```typescript
-function generateQRCode(): string {
-  const timestamp = Date.now();
-  const random = crypto.randomBytes(4).toString("hex");
-  return `WS-${timestamp}-${random}`;
-}
+Sinh viên gửi yêu cầu đăng ký workshop không có phí. Hệ thống thực hiện các kiểm tra:
+- Xác thực JWT token
+- Workshop tồn tại
+- Workshop chưa bắt đầu
+- Có chỗ trống
+- Sinh viên chưa đăng ký workshop này
 
-// Example: WS-1717234567890-a1b2c3d4
-```
+Nếu tất cả kiểm tra vượt qua, hệ thống tạo một đăng ký với trạng thái "confirmed" ngay lập tức. QR code được tạo theo định dạng `WS-{timestamp}-{random}` và thêm vào đăng ký.
 
-### Transaction Isolation Level
+Chỗ ngồi trong workshop tăng lên 1. Thông báo xác nhận được gửi cho sinh viên qua email và ứng dụng trong nước (không chặn phản hồi API).
 
-```typescript
-await this.dataSource.transaction(
-  "SERIALIZABLE", // Highest isolation
-  async (manager) => {
-    // All queries here are isolated
-  },
-);
-```
+**Điều kiện trước:**
+- Người dùng đã đăng nhập
+- Workshop có chỗ trống
+- Workshop chưa bắt đầu
 
-### Lock Timeout Config
-
-```sql
--- PostgreSQL config
-ALTER DATABASE unihub SET lock_timeout = '5s';
-ALTER DATABASE unihub SET idle_in_transaction_session_timeout = '10s';
-```
-
-### Connection Pool Sizing
-
-```typescript
-// typeorm config
-{
-  type: 'postgres',
-  poolSize: 100,  // Max connections
-  extra: {
-    max: 100,
-    min: 20,
-    idleTimeoutMillis: 30000
-  }
-}
-```
+**Kết quả:**
+- Đăng ký được tạo với trạng thái 'confirmed'
+- Chỗ ngồi được bảo lưu
+- Thông báo được gửi
 
 ---
 
-## Dependencies
+### 2. Đăng ký Workshop Có phí
 
-- TypeORM transaction support
-- PostgreSQL 12+ (FOR UPDATE support)
-- Redis (idempotency cache)
-- Bull Queue (retry jobs)
-- Payment gateway SDK (Stripe/PayPal)
+Sinh viên gửi yêu cầu đăng ký workshop có phí kèm idempotency key (để tránh trừ tiền 2 lần). Hệ thống thực hiện kiểm tra tương tự như workshop miễn phí.
+
+Nếu vượt qua, đăng ký được tạo với trạng thái "pending" (chờ thanh toán). Bản ghi thanh toán được tạo với idempotency key và status "pending". Chỗ ngồi được bảo lưu.
+
+Thanh toán sẽ được xử lý trong bước tiếp theo (xem phần 2.1).
+
+**Điều kiện trước:**
+- Người dùng đã đăng nhập
+- Workshop có phí
+- Có chỗ trống
+
+**Kết quả:**
+- Đăng ký với trạng thái 'pending'
+- Chỗ ngồi được giữ trong vòng 10 phút
+- Chờ thanh toán hoặc hủy
+
+---
+
+### 2.1. Thanh toán Workshop
+
+Sinh viên gửi yêu cầu thanh toán với idempotency key. Hệ thống kiểm tra:
+- Đăng ký ở trạng thái 'pending'
+- Idempotency key chưa được xử lý (kiểm tra cache rồi database)
+
+Nếu key đã được xử lý, trả về kết quả cached để tránh trừ tiền 2 lần.
+
+Nếu là yêu cầu mới, hệ thống gọi cổng thanh toán qua Circuit Breaker. Nếu thành công, cập nhật trạng thái payment thành 'success' và registration thành 'confirmed', rồi gửi thông báo.
+
+Nếu cổng thanh toán bị sập (Circuit Breaker ở trạng thái OPEN), giữ đăng ký ở 'pending' và tạo job retry với exponential backoff (bắt đầu từ 5000ms).
+
+Nếu thanh toán thất bại (thẻ bị từ chối, không đủ tiền...), cập nhật payment thành 'failed', hủy đăng ký, và giải phóng chỗ ngồi.
+
+**Kết quả (thành công):**
+- Đăng ký xác nhận
+- Thanh toán hoàn tất
+- QR code được tạo
+
+**Kết quả (thất bại):**
+- Chỗ ngồi được giải phóng
+- Sinh viên có thể thử lại
+
+---
+
+### 3. Hủy đăng ký
+
+Sinh viên hủy đăng ký của mình. Hệ thống kiểm tra:
+- Đăng ký thuộc về sinh viên
+- Workshop bắt đầu trong hơn 24 giờ (chính sách hủy)
+- Đăng ký ở trạng thái 'pending' hoặc 'confirmed'
+
+Nếu vượt qua, hủy đăng ký (status thành 'cancelled') và giải phóng chỗ ngồi. Nếu có bản ghi thanh toán, cập nhật thành 'failed'. Thông báo hủy được gửi cho sinh viên.
+
+**Kết quả:**
+- Đăng ký hủy
+- Chỗ ngồi được giải phóng
+- Thông báo gửi cho sinh viên
+
+---
+
+## Tại sao Pessimistic Locking?
+
+Hệ thống sử dụng Pessimistic Locking (khóa hàng ngay lập tức) thay vì Optimistic Locking (kiểm tra xung đột sau) để đảm bảo 0% oversell:
+
+- **Pessimistic (FOR UPDATE):** Khóa hàng trước, xử lý tuần tự → Không có xung đột, luôn chính xác
+- **Optimistic (Version Check):** Kiểm tra phiên bản khi lưu → Dễ bị xung đột, cần retry nhiều
+
+Khi 100 sinh viên đăng ký workshop 60 chỗ với Pessimistic Locking: 60 thành công, 40 thất bại (chính xác).
+Khi dùng Optimistic: Có nguy cơ 65-70 người thành công (oversell).
+
+**Ràng buộc:**
+- Transaction isolation: READ COMMITTED (mặc định PostgreSQL)
+- Lock timeout: 5 giây
+- Pessimistic locking: PostgreSQL FOR UPDATE
+
+---
+
+## Kịch bản lỗi
+
+### 1. Workshop đã full
+
+Khi số sinh viên đã đăng ký bằng hoặc vượt quá sức chứa, yêu cầu đăng ký mới bị từ chối.
+
+**Lỗi:** 409 Conflict - Workshop is full
+
+**Hành động:** Sinh viên chọn workshop khác
+
+### 2. Đã đăng ký workshop này rồi
+
+Khi sinh viên thử đăng ký lại cùng workshop, yêu cầu bị từ chối.
+
+**Lỗi:** 409 Conflict - Already registered for this workshop
+
+**Hành động:** Hiển thị QR code hiện có
+
+### 3. Hủy yêu cầu trong 24 giờ
+
+Nếu workshop bắt đầu trong ít hơn 24 giờ, hủy không được phép.
+
+**Lỗi:** 400 Bad Request - Cannot cancel within 24 hours of workshop
+
+### 4. Thanh toán hết hạn
+
+Nếu thanh toán vượt quá 10 phút (payment timeout), hệ thống vẫn giữ đăng ký ở trạng thái 'pending' và tạo job retry với exponential backoff bắt đầu từ 5000ms, tối đa 5 lần thử.
+
+**Lỗi:** 201 Created - Registration pending, payment processing
+
+### 5. Payment gateway sập (Circuit Breaker OPEN)
+
+Khi gateway gặp 5 lỗi trong vòng 60 giây, Circuit Breaker chuyển sang trạng thái OPEN. Tất cả yêu cầu thanh toán bị từ chối ngay lập tức (fail-fast). Hệ thống vẫn giữ đăng ký ở 'pending' và tạo retry job.
+
+**Lỗi:** 503 Service Unavailable
+
+**Khi nào hết:** Sau 30 giây, Circuit Breaker chuyển sang HALF_OPEN (cho phép 1 yêu cầu thử) hoặc CLOSED nếu thành công.
+
+### 6. Thẻ bị từ chối
+
+Khi thẻ hết tiền hoặc hết hạn, thanh toán thất bại. Đăng ký được giữ lại để sinh viên thử lại với thẻ khác.
+
+**Lỗi:** 402 Payment Required
+
+**Hành động:** Sinh viên cung cấp thẻ mới
+
+### 7. Idempotency key trùng (yêu cầu retry)
+
+Nếu sinh viên gửi lại yêu cầu với cùng idempotency key, hệ thống trả về kết quả cached (24 giờ TTL) hoặc kiểm tra database, không trừ tiền 2 lần.
+
+**Kết quả:** Phản hồi giống như lần đầu tiên
+
+## Ràng buộc
+
+| Ràng buộc | Giá trị |
+|-----------|---------|
+| Max đăng ký/sinh viên/workshop | 1 |
+| Hạn hủy | 24 giờ trước workshop |
+| Format QR code | WS-{timestamp}-{8-char-hex} |
+| Retry thanh toán | 5 lần, exponential backoff từ 5000ms |
+| Circuit breaker threshold | 5 lỗi trong 60 giây |
+| Circuit breaker cooldown | 30 giây |
+| Payment timeout | 10 phút |
+| Idempotency key TTL | 24 giờ cache, 30 giây lock khi xử lý |
+| Response time (miễn phí) | < 500ms (P95) |
+| Response time (có phí) | < 2 giây (P95) |
+| Concurrent requests | 12,000 trong 10 phút |
+
+---
+
+## Tiêu chí chấp nhận
+
+### Kiểm thử chức năng
+
+- Sinh viên đăng ký workshop miễn phí → Thành công
+- Sinh viên đăng ký workshop có phí → Tạo đăng ký 'pending'
+- Đăng ký workshop đã full → Lỗi 409
+- Đăng ký lại workshop đã đăng ký → Lỗi 409
+- Hủy đăng ký > 24h trước → Thành công
+- Hủy đăng ký < 24h trước → Lỗi 400
+- Thanh toán thất bại → Đăng ký hủy, chỗ giải phóng
+- Thanh toán hết hạn → Đăng ký 'pending', job retry được tạo
+- Circuit breaker OPEN → Tất cả thanh toán thất bại, job retry được tạo
+- Retry với cùng idempotency key → Trả về kết quả cached, không trừ tiền 2 lần
+
+### Kiểm thử độ tin cậy
+
+- 100 yêu cầu đồng thời workshop 60 chỗ → Đúng 60 thành công, 40 thất bại
+- Không bao giờ bán quá sức chứa
+- registered_count luôn chính xác
+- QR code không bao giờ trùng
+
+### Kiểm thử hiệu suất
+
+- 12,000 đăng ký trong 10 phút → 100% thành công
+- P95 response time < 500ms (miễn phí)
+- P95 response time < 2 giây (có phí)
