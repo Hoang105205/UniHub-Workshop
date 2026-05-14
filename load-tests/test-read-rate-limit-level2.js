@@ -3,12 +3,12 @@ import { check, sleep } from 'k6';
 
 export const options = {
   vus: 1, // Dùng 1 user ảo
-  iterations: 20, // Cố tình bắn 40 phát (Lớn hơn định mức 30)
+  iterations: 40, // Cố tình bắn 40 phát (Lớn hơn định mức 30)
 };
 
 export default function () {
   // BẮT BUỘC: Thay bằng token thật của bạn
-  const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijg5OTY1MzM5LTE0NjItNDNlOC1iYTFkLWYxODZjOWM3MTFjNiIsImVtYWlsIjoiaHV5aG9hbmdsdXUxMDVAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE3Nzg1MTE1NDYsImV4cCI6MTc3OTExNjM0Nn0.Rk4ZuYu62IElhdGWBMxlYgoLkXH0EwUMDtAmwYak8Wk'; 
+  const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjhjZDc0MjVlLWQyYmItNDExMy1hMmZiLWIxMzFjYmRjMWIwOSIsImVtYWlsIjoidHJhbi50aGkuYkBzdHVkZW50LmVkdS52biIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzc4NzMzMDIyLCJleHAiOjE3NzkzMzc4MjJ9.I0gRZw1FNlqDYwsOoVVn69JU6U3_zOLPe7527bil3uE'; 
   
   const params = {
     headers: {
@@ -17,7 +17,7 @@ export default function () {
     },
   };
 
-  const res = http.get('http://localhost:3000/api/workshops', params);
+  const res = http.get('http://localhost/api/workshops', params);
 
   check(res, {
     'Qua trạm an toàn (200 OK)': (r) => r.status === 200,
