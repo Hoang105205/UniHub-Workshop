@@ -176,19 +176,17 @@ graph TB
     classDef container fill:#1168bd,stroke:#0b4d8c,color:#ffffff;
     classDef proxy fill:#d35400,stroke:#a04000,color:#ffffff;
 
-    subgraph Local_Server [💻 Local Development Server / Laptop]
+    subgraph Instance_Server [💻 Cloud Instance / VPS]
         direction TB
 
-        CT["🌐 Cloudflare Tunnel<br/>(Expose localhost)"]:::proxy
-
         subgraph Docker_Compose [🐳 Docker Compose Environment]
-            NX["🛡️ Nginx Container<br/>(Rate Limit: 50 req/s/IP)"]:::proxy
+            NX["🛡️ Nginx Container<br/>"]:::proxy
 
-            subgraph PM2_Cluster [⚙️ PM2 Cluster Manager]
+            subgraph API_Replicas [📦 NestJS API Replicas]
                 direction LR
-                N1["NestJS Node 1<br/>(Port 4001)"]:::container
-                N2["NestJS Node 2<br/>(Port 4002)"]:::container
-                N3["NestJS Node ...<br/>(Port 400n)"]:::container
+                N1["Server Replica 1"]:::container
+                N2["Server Replica 2"]:::container
+                N3["Server Replica ..."]:::container
             end
 
             W_Nodes["⚙️ Worker Nodes<br/>(Chạy ngầm xử lý Job)"]:::container
@@ -197,13 +195,12 @@ graph TB
 
     subgraph Cloud_Infrastructure [☁️ Cloud Managed Services]
         direction LR
-        UP[("⚡ Upstash Serverless<br/>(Redis & BullMQ)")]:::cloudNode
-        SP[("🐘 Supabase<br/>(PostgreSQL qua Supavisor)")]:::cloudNode
+        UP[("Redis")]:::cloudNode
+        SP[("PostgreSQL")]:::cloudNode
     end
 
     %% Connections
-    Internet((Internet / End Users)) -->|HTTPS| CT
-    CT -->|Traffic| NX
+    Internet((Internet / End Users)) -->|HTTP/HTTPS| NX
     NX -->|Round-Robin| N1
     NX -->|Round-Robin| N2
     NX -->|Round-Robin| N3
