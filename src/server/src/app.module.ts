@@ -5,6 +5,7 @@ import { databaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
+import { CheckInsModule } from './modules/check-ins/check-ins.module';
 import { RegistrationsModule } from './modules/registrations/registrations.module';
 import { MockGatewayModule } from './modules/mock-gateway/mock-gateway.module';
 import { WorkshopsModule } from './modules/workshops/workshops.module';
@@ -27,6 +28,7 @@ import { RedisModule } from './redis/redis.module';
     NotificationModule,
     CsvSyncModule,
     AuthModule,
+    CheckInsModule,
     RegistrationsModule,
     MockGatewayModule,
     WorkshopsModule,
