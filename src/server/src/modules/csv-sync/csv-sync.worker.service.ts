@@ -55,6 +55,13 @@ export class CsvSyncWorkerService implements OnModuleInit {
 
   // Khởi tạo lịch chạy định kỳ khi Server start
   async onModuleInit() {
+    const repeatableJobs = await this.syncQueue.getRepeatableJobs();
+
+    // Xóa toàn bộ các lịch trình đang có sẵn trong Redis
+    for (const job of repeatableJobs) {
+      await this.syncQueue.removeRepeatableByKey(job.key);
+    }
+
     const cronSchedule = process.env.STUDENT_SYNC_CRON || '0 0 * * *';
 
     await this.syncQueue.add(
