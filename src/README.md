@@ -179,3 +179,31 @@ npm run start:docker
 ```bash
 docker-compose down
 ```
+
+## 📱 Appendix: Android Emulator Setup (Windows)
+
+If you are using Windows, follow these steps to configure the Android Emulator for a seamless development experience within VS Code.
+
+### Step 1: Add Android Emulator to System PATH
+This allows Windows to recognize emulator commands from the terminal.
+
+1. Open File Explorer, paste `%LOCALAPPDATA%\Android\Sdk\emulator` into the address bar, and hit Enter. Copy this directory path (e.g., `C:\Users\Admin\AppData\Local\Android\Sdk\emulator`). *Note: It must end with `\emulator`, not `emulator.exe`.*
+2. Press the **Windows** key, search for **Environment Variables**, and select *Edit the system environment variables*.
+3. Click the **Environment Variables...** button at the bottom right.
+4. In the **System variables** section, find the **`Path`** variable and click **Edit**.
+5. Click **New** and paste the emulator path from step 1. Add another **New** entry for the `platform-tools` folder (e.g., `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools`) to enable ADB commands.
+6. Click **OK** to save everything. **Restart VS Code** to apply the new PATH.
+
+### Step 2: Install & Configure VS Code Extension
+This extension allows you to launch the emulator with a single click inside VS Code.
+
+1. In VS Code, open the Extensions tab (`Ctrl + Shift + X`), search for and install **Android iOS Emulator** by **Diemas Michiels**.
+2. Open Settings (`Ctrl + ,`) and search for `Emulator Path`.
+3. Replace the default macOS path with your Windows emulator path from Step 1 (e.g., `C:\Users\<Your_Username>\AppData\Local\Android\Sdk\emulator`).
+
+### Step 3: Start the Emulator
+*Rule of thumb: Always start the emulator and wait for the home screen to load completely before running the code.*
+
+1. Open the Command Palette in VS Code (`Ctrl + Shift + P`).
+2. Type `Emulator: Run` and press Enter.
+3. Select your Android virtual device (e.g., `Pixel_7_API_34`) from the dropdown list. The emulator will boot up in a standalone window.
