@@ -24,6 +24,10 @@ import { Role } from '../../entities/roles.enum';
 import { WorkshopsService } from './workshops.service';
 import { CreateWorkshopDto } from './dto/create-workshop.dto';
 import { UpdateWorkshopDto } from './dto/update-workshop.dto';
+import { Throttle } from '@nestjs/throttler';
+import { UserThrottlerGuard } from '../../common/guards/user-throttler.guard';
+import { RATE_LIMIT } from '../../config/rate-limit.config';
+import { AiRateLimitInterceptor } from './interceptors/ai-rate-limit.interceptor';
 
 const pdfFileFilter = (
   _request: unknown,
@@ -31,18 +35,22 @@ const pdfFileFilter = (
   callback: (error: Error | null, acceptFile: boolean) => void,
 ) => {
   if (file.mimetype !== 'application/pdf') {
-    return callback(new BadRequestException('Only PDF files are allowed'), false);
+    return callback(
+      new BadRequestException('Only PDF files are allowed'),
+      false,
+    );
   }
 
   return callback(null, true);
 };
 
 @Controller('workshops')
+@UseGuards(JwtAuthGuard, UserThrottlerGuard)
 export class WorkshopsController {
   constructor(private readonly workshopsService: WorkshopsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('introDocument', {
@@ -50,6 +58,7 @@ export class WorkshopsController {
       fileFilter: pdfFileFilter,
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
+    AiRateLimitInterceptor,
   )
   async create(
     @Body() dto: CreateWorkshopDto,
@@ -59,7 +68,7 @@ export class WorkshopsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('introDocument', {
@@ -67,6 +76,7 @@ export class WorkshopsController {
       fileFilter: pdfFileFilter,
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
+    AiRateLimitInterceptor,
   )
   async update(
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -77,15 +87,17 @@ export class WorkshopsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
+  @Throttle({ default: RATE_LIMIT.ADMIN })
   async remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.workshopsService.remove(id);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT, Role.ADMIN)
+  @Throttle({ default: RATE_LIMIT.READ }) // Giới hạn 30 request / 1 phút cho endpoint này
   async listUpcoming(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -97,8 +109,9 @@ export class WorkshopsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.STUDENT, Role.ADMIN)
+  @Throttle({ default: RATE_LIMIT.READ }) // Giới hạn 30 request / 1 phút cho endpoint này
   async getDetail(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() request: { user: { id: string } },

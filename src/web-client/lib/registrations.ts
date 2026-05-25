@@ -53,7 +53,7 @@ export interface RegistrationListItem {
 }
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api";
+  process.env.NEXT_PUBLIC_API_URL;
 
 async function handleJsonResponse<T>(response: Response): Promise<T> {
   const data = (await response.json().catch(() => null)) as {

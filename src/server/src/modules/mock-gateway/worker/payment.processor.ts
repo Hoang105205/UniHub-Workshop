@@ -3,7 +3,7 @@ import type { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Inject, Logger } from '@nestjs/common';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import { MockGatewayService } from '../mock-gateway.service';
 import { RedisCircuitBreakerService } from '../redis-circuit-breaker.service';
 import { Payment, PaymentStatus } from '../../../entities/payment.entity';
@@ -15,10 +15,10 @@ import { MockChargeDto } from '../dto/mock-charge.dto';
 import {
   MOCK_GATEWAY_QUEUE,
   MOCK_GATEWAY_JOB,
-  MOCK_GATEWAY_REDIS_TOKEN,
 } from '../mock-gateway.constants';
 import { generateQrCode } from '../../../utils/qr.utils';
 import { RegistrationsService } from '../../registrations/registrations.service';
+import { REDIS_CLIENT_TOKEN } from '../../../redis/redis.constants';
 
 @Processor(MOCK_GATEWAY_QUEUE)
 export class PaymentProcessor {
@@ -31,7 +31,7 @@ export class PaymentProcessor {
     private readonly dataSource: DataSource,
     @InjectRepository(Registration)
     private readonly registrationRepository: Repository<Registration>,
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
   ) {}
 
   @Process(MOCK_GATEWAY_JOB)
@@ -61,7 +61,7 @@ export class PaymentProcessor {
         transactionId: result.transactionId,
         status: 'SUCCESS',
       };
-      await this.redis.set(redisKey, finalResult, { ex: 86400 });
+      await this.redis.set(redisKey, JSON.stringify(finalResult), 'EX', 86400);
 
       this.logger.debug(
         `Đã hoàn tất quy trình thanh toán thành công cho ${dto.registrationId}`,

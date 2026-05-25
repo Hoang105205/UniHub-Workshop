@@ -1,370 +1,322 @@
 # Đặc tả: Payment Processing (Circuit Breaker & Idempotency)
 
-## 1. Mô tả
+## Mô tả
 
 Hệ thống thanh toán workshop có phí sử dụng **mock payment gateway**, tập trung vào 2 cơ chế bảo vệ cốt lõi:
+1. **Circuit Breaker:** Ngăn chặn gọi payment gateway khi hệ thống bị sập, giúp fail-fast và không làm treo server.
+2. **Idempotency Key:** Chống double charge khi client gặp lỗi mạng và retry.
 
-1. **Circuit Breaker:** Ngăn chặn gọi payment gateway khi hệ thống này bị sập (down), giúp fail-fast và không làm treo server.
-2. **Idempotency Key:** Chống trừ tiền 2 lần (double charge) khi client gặp lỗi mạng và gửi lại yêu cầu (retry).
-
-**Lưu ý:** Đây là mock payment cho đồ án, không tích hợp gateway thật. Sinh viên sẽ thấy trang xác nhận với 2 nút: `Cancel` và `Pay`.
+**Lưu ý:** Đây là mock payment cho đồ án, không tích hợp gateway thật. Sinh viên thấy trang xác nhận với nút "Cancel" và "Pay".
 
 **Mục tiêu:**
+- Tự động hạ cấp duy trì dịch vụ khi payment gateway gặp sự cố
+- Đảm bảo 0% double charge dù client retry nhiều lần
+- Workshop listing vẫn hoạt động khi payment down (99.9% uptime cho tính năng cốt lõi)
 
-- Tự động hạ cấp duy trì dịch vụ (Graceful degradation) khi payment gateway gặp sự cố.
-- Đảm bảo 0% double charge dù client có retry nhiều lần.
-- Workshop listing vẫn hoạt động bình thường khi payment down (đảm bảo 99.9% uptime cho tính năng cốt lõi).
+---
 
-## 2. Luồng chính
+## Luồng chính
 
-### 2.1. Luồng thanh toán hoàn chỉnh (Happy Path)
+### 1. Luồng thanh toán hoàn chỉnh (Happy Path)
 
-**Context:** Sinh viên đã đăng ký workshop có phí, registration đang ở trạng thái `pending`.
+**Context:** Sinh viên đã đăng ký workshop có phí, registration ở trạng thái `pending`
 
 **Flow:**
+1. Sinh viên truy cập trang chi tiết vé (`/my-registrations/:id`), xem số tiền
+2. Frontend tự động tạo Idempotency Key (UUID v4) nếu chưa có, gửi kèm Header
+3. Backend kiểm tra Key trong Cache (Redis), sau đó kiểm tra Database để đảm bảo chưa xử lý
+4. Backend tạo bản ghi `payments` với status = 'pending'
+5. Gọi Mock Payment Gateway qua Circuit Breaker
+6. Nếu thành công:
+   - Update payment: status = 'success', transaction_id được lưu
+   - Update registration: status = 'confirmed'
+   - Cache lại kết quả Idempotency Key (24 giờ TTL)
+   - Đẩy job email/thông báo xác nhận
+   - Trả về QR code
+7. Nếu failed: Xem phần "Kịch bản lỗi"
 
-1. **Giao diện:** Sinh viên truy cập trang chi tiết vé (`/my-registrations/:id`), xem số tiền và bấm nút `[Pay Now]`.
-2. **Khởi tạo định danh:** Frontend tự động tạo một Idempotency Key (UUID v4) và gửi kèm trong Header của request thanh toán.
-3. **Kiểm tra Idempotency:** Backend nhận request, ưu tiên kiểm tra Key này trong Cache (Redis), sau đó kiểm tra trong Database để đảm bảo giao dịch này chưa từng được xử lý.
-4. **Khởi tạo thanh toán:** Backend tạo bản ghi `payments` với trạng thái `pending`.
-5. **Gọi Gateway:** Hệ thống gọi đến Mock Payment Gateway thông qua lớp bảo vệ Circuit Breaker.
-6. **Cập nhật trạng thái:** Nếu Gateway trả về thành công, cập nhật trạng thái payment thành `success`, đồng thời chuyển trạng thái registration thành `confirmed`.
-7. **Lưu vết & Thông báo:** Cache lại kết quả Idempotency Key trong 24h và đẩy Job gửi email/thông báo xác nhận cho sinh viên vào Queue.
-8. **Phản hồi:** Trả về kết quả cho Frontend để hiển thị QR code.
+---
 
-### 2.2. Mock Payment Gateway (Demo Implementation)
+### 2. Mock Payment Gateway
 
-**Mục đích:** Giả lập một cổng thanh toán có khả năng phát sinh lỗi (fail) hoặc quá hạn thời gian (timeout) để kiểm thử hoạt động của Circuit Breaker.
+**Mục đích:** Giả lập cổng thanh toán với khả năng phát sinh lỗi hoặc quá hạn thời gian
+
+**Default Configuration:**
+- **Failure Rate:** 0% (không có lỗi)
+- **Latency:** 200ms
+- **Configurable:** Via API `/mock-gateway/config` endpoint
 
 **Các kịch bản hỗ trợ:**
+- Giả lập failure rate ngẫu nhiên (VD: 50% request bị lỗi)
+- Giả lập timeout (15 giây để Circuit Breaker tự ngắt)
 
-- Giả lập tỷ lệ lỗi ngẫu nhiên (Ví dụ: 50% request sẽ bị lỗi).
-- Giả lập Timeout (Giữ request lơ lửng trong 15s để Circuit Breaker tự ngắt).
-- Admin có thể điều khiển các thông số này qua các API ẩn.
+---
 
-**Demo Scenarios (Sử dụng cURL):**
-
-```bash
-# Normal mode (100% success)
-curl -X POST /admin/payment-gateway/set-failure-rate -d '{"rate": 0}'
-
-# Simulate 50% failure rate
-curl -X POST /admin/payment-gateway/set-failure-rate -d '{"rate": 50}'
-
-# Simulate timeout (trigger Circuit Breaker)
-curl -X POST /admin/payment-gateway/set-timeout-mode -d '{"enabled": true}'
-```
-
-### 2.3. Cơ chế ngắt mạch (Circuit Breaker)
-
-Mục đích: Ngăn hệ thống tiếp tục gọi đến Gateway nếu nó đã bị lỗi liên tục, tránh hiệu ứng domino làm sập toàn bộ Backend.
+### 3. Cơ chế Circuit Breaker
 
 **Quản lý 3 trạng thái:**
 
-- **CLOSED (Bình thường):** Mọi request đi qua bình thường. Nếu phát hiện 5 lỗi trong vòng 60 giây, chuyển sang OPEN.
+#### CLOSED (Bình thường)
+- Mọi request đi qua bình thường
+- Nếu phát hiện 5 lỗi trong vòng 60 giây → chuyển OPEN
 
-- **OPEN (Ngắt mạch):** Chặn ngay lập tức mọi request gửi đến Gateway. Sau 30 giây thời gian chờ, chuyển sang HALF_OPEN.
+#### OPEN (Ngắt mạch)
+- Chặn ngay lập tức mọi request gửi đến Gateway
+- Thời gian chờ: 30 giây
+- Sau 30 giây → chuyển HALF_OPEN
 
-- **HALF_OPEN (Thử nghiệm):** Cho phép duy nhất 1 request đi qua để "thăm dò". Nếu thành công -> Trở lại CLOSED. Nếu thất bại -> Quay lại OPEN.
+#### HALF_OPEN (Thử nghiệm)
+- Cho phép duy nhất 1 request đi qua để "thăm dò"
+- Nếu thành công → Trở lại CLOSED
+- Nếu thất bại → Quay lại OPEN
 
-### 2.4. Graceful Degradation (Hạ cấp dịch vụ)
-
-Context: Khi Circuit Breaker đang ở trạng thái OPEN (Gateway sập).
-
-**Các bước thực hiện:**
-
-- Request thanh toán của sinh viên bị Circuit Breaker chặn lại ngay lập tức.
-
-- Backend "bắt" được lỗi này, thay vì báo lỗi bắt user làm lại, hệ thống giữ nguyên bản ghi payment ở trạng thái pending.
-
-- Hệ thống tạo một tác vụ nền (Retry Job) đẩy vào Bull Queue với cơ chế Exponential Backoff (thử lại sau 1p, 2p, 4p...).
-
-- Trả về phản hồi cho Frontend biết hệ thống đang bận và giao dịch sẽ được xử lý ngầm.
-
-- Frontend hiển thị thông báo "Thanh toán đang xử lý, QR code sẽ được gửi qua email" thay vì báo lỗi đỏ.
-
----
-
-## 3. Kịch bản lỗi
-
-### 3.1. Client timeout và retry với CÙNG một Idempotency Key
-
-- **Trigger**: Mạng chập chờn, client không nhận được phản hồi nên gửi lại request y hệt.
-
-- **Xử lý**: Backend phát hiện Key đã tồn tại trong Cache. Lập tức trả về kết quả đã cache trước đó với HTTP 200 OK. Không gọi Gateway, không có double charge.
-
-### 3.2. Client retry với KHÁC Idempotency Key
-
-- **Trigger**: Sinh viên mất kiên nhẫn, reload trang và bấm nút "Pay" nhiều lần, mỗi lần Frontend sinh ra một Key mới.
-
-- **Xử lý**: Backend kiểm tra Database, thấy Registration này đã được thanh toán thành công (hoặc đang xử lý). Trả về lỗi 409 Conflict - Registration already paid.
-
-### 3.3. Circuit Breaker OPEN
-
-- **Trigger**: Có hơn 5 lỗi trong 60s.
-
-- **Xử lý**: Trả về mã lỗi 503 Service Unavailable. Frontend hiển thị đồng hồ đếm ngược 30s và tạm khóa nút "Pay".
-
-### 3.4. Gateway từ chối thẻ (Card declined)
-
-- **Trigger**: Mock gateway trả về lỗi logic (không đủ tiền, sai thông tin).
-
-- **Xử lý**: Đánh dấu payment là failed. Không xóa đăng ký (registration) để sinh viên có cơ hội dùng thẻ khác thanh toán lại. Trả về lỗi 402 Payment Required.
+**Thống kê:**
+| Thông số | Giá trị |
+| -------- | ------ |
+| Fail threshold | 5 lỗi |
+| Check window | 60 giây |
+| Cooldown (OPEN→HALF_OPEN) | 30 giây |
 
 ---
 
-## 4. Ràng buộc (Constraints)
+### 4. Graceful Degradation (Hạ cấp dịch vụ)
 
-**Business Rules**
+**Khi Circuit Breaker ở trạng thái OPEN (Gateway sập):**
+1. Request thanh toán bị Circuit Breaker chặn lại ngay
+2. Backend giữ payment status = 'pending' (không update)
+3. Tạo tác vụ Retry vào Bull Queue:
+   - **Retry attempts:** 5 lần
+   - **Backoff:** Exponential (5s, 10s, 20s, 40s, 80s)
+4. Trả về HTTP 202 Accepted
+   - Message: "Payment system is busy. We will process it shortly."
+5. Frontend hiển thị: "QR code sẽ được gửi qua email"
+6. Khi circuit HALF_OPEN hoặc CLOSED, retry jobs chạy tự động
+
+---
+
+## Kịch bản lỗi
+
+### 1. Client timeout và retry với CÙNG Idempotency Key
+- **Trigger:** Mạng chập chờn, client không nhận phản hồi, gửi lại request y hệt
+- **Xử lý:** Backend phát hiện Key đã tồn tại trong Cache
+- **Result:** Trả về kết quả đã cache (HTTP 200 OK)
+- **Guarantee:** Không gọi Gateway, không có double charge
+
+### 2. Client retry với KHÁC Idempotency Key
+- **Trigger:** Sinh viên reload trang, bấm "Pay" nhiều lần, mỗi lần Key mới
+- **Xử lý:** Backend kiểm tra Database
+- **Result:** Thấy Registration đã thanh toán → Trả lỗi 409 Conflict
+- **Message:** "Registration already paid"
+
+### 3. Circuit Breaker OPEN
+- **Trigger:** Có > 5 lỗi trong 60s
+- **Response:** HTTP 503 Service Unavailable
+- **Frontend:** Hiển thị đồng hồ đếm ngược 30s, tạm khóa nút "Pay"
+- **Backend:** Đẩy retry job vào queue
+
+### 4. Card declined / Payment failed
+- **Trigger:** Mock gateway trả về lỗi logic (không đủ tiền, sai thông tin)
+- **Response:** HTTP 402 Payment Required
+- **Message:** "Payment failed: {error message}"
+- **Database:** Đánh dấu payment = 'failed'
+- **Registration:** Không xóa (sinh viên có thể retry lại)
+
+### 5. Idempotency Key Format Invalid
+- **Trigger:** Idempotency Key không phải UUID v4
+- **Response:** HTTP 400 Bad Request
+- **Message:** "Invalid idempotency key format"
+
+### 6. Timeout Lock Exceeded
+- **Trigger:** Processing state lock > 30 giây (ngăn race condition)
+- **Response:** HTTP 409 Conflict
+- **Message:** "Payment processing conflict. Please retry."
+
+---
+
+## Ràng buộc
+
+### Business Rules
+
 | Ràng buộc | Giá trị |
 |-----------|---------|
 | Idempotency key format | UUID v4 |
 | Idempotency key TTL (cache) | 24 hours |
-| Payment timeout | 10 seconds |
+| Idempotency processing lock duration | 30 seconds |
+| Payment processing timeout | 10 seconds |
 | Circuit breaker failure threshold | 5 errors in 60 seconds |
-| Circuit breaker open timeout | 30 seconds |
+| Circuit breaker open state duration | 30 seconds |
 | Payment retry attempts | 5 times |
-| Retry backoff | Exponential (1min, 2min, 4min, 8min, 16min) |
+| Retry backoff strategy | Exponential (5s, 10s, 20s, 40s, 80s) |
 
-**Performance**
+### Performance
+
 | Ràng buộc | Giá trị |
 |-----------|---------|
 | Payment processing time | < 2s (P95) |
 | Circuit breaker decision time | < 5ms |
-| Idempotency check time | < 50ms |
+| Idempotency cache check time | < 50ms |
 | Cache hit rate | > 90% |
 
-**Data Integrity**
+### Data Integrity
 
-- **Idempotency key unique:** Ràng buộc UNIQUE ở tầng Database.
-
-- **Payment status immutability:** Tuyệt đối không cho phép chuyển trạng thái từ success về lại pending.
+- **Idempotency key unique:** Constraint UNIQUE ở tầng Database
+- **Payment status immutability:** Tuyệt đối không cho phép chuyển từ success sang pending
+- **Atomic updates:** Payment status và registration status cập nhật cùng transaction
 
 ---
 
-## 5. Tiêu chí chấp nhận (Acceptance Criteria)
+## Tiêu chí chấp nhận
 
-**Functional Tests**  
-[ ] **TC-PAY-001:** Thanh toán thành công -> Xác nhận Registration, cấp QR code.
+### Functional Tests
 
-[ ] **TC-PAY-002:** Thử lại với cùng Idempotency Key -> Trả về cache, không trừ tiền hai lần.
+- [ ] **TC-PAY-001:** Thanh toán thành công → Registration confirmed, QR code cấp
+- [ ] **TC-PAY-002:** Retry với cùng Idempotency Key → Cached response, không trừ tiền 2 lần
+- [ ] **TC-PAY-003:** Retry với Key khác nhưng vé đã thanh toán → Conflict (409)
+- [ ] **TC-PAY-004:** Gateway timeout → Circuit breaker ghi nhận 1 lỗi
+- [ ] **TC-PAY-005:** 5 lỗi liên tiếp → Circuit OPEN
+- [ ] **TC-PAY-006:** Circuit OPEN → Chặn request, trả lỗi 503
+- [ ] **TC-PAY-007:** Sau 30s → Circuit chuyển HALF_OPEN
+- [ ] **TC-PAY-008:** Card declined → Status = failed, registration giữ pending
+- [ ] **TC-PAY-009:** Job retry tự động chạy sau 5s nếu Circuit đang OPEN
 
-[ ] **TC-PAY-003:** Thử lại với Key khác nhưng vé đã thanh toán -> Báo lỗi Conflict (409).
+### Resilience & Performance Tests
 
-[ ] **TC-PAY-004:** Gateway bị timeout -> Circuit breaker ghi nhận 1 lỗi.
+- [ ] **TC-RES-001:** 50% failure rate → Circuit Breaker được kích hoạt
+- [ ] **TC-RES-002:** Cache miss fallback → Idempotency fallback dùng Database
+- [ ] **TC-PERF-001:** 100 payment requests cùng lúc → Xử lý < 2s (P95)
 
-[ ] **TC-PAY-005:** 5 lỗi liên tiếp -> Circuit ngắt mạch (OPEN).
+---
 
-[ ] **TC-PAY-006:** Circuit OPEN -> Lập tức chặn request và báo lỗi ServiceUnavailable.
+## Dependencies
 
-[ ] **TC-PAY-007:** Sau 30s mở lại -> Circuit chuyển sang chế độ thử nghiệm (HALF_OPEN).
+- Redis (Idempotency cache)
+- Bull Queue (Retry job queue)
+- PostgreSQL (Payment & Registration data)
+- Mock Gateway Service (payment simulation)
 
-[ ] **TC-PAY-008:** Thanh toán lỗi thẻ -> Trạng thái báo failed, vé giữ nguyên chờ thanh toán lại.
+## Luồng chính
 
-[ ] **TC-PAY-009:** Job retry tự động chạy sau 1 phút nếu Circuit đang bị OPEN.
+### Luồng thanh toán hoàn chỉnh (Happy Path)
 
-**Resilience & Performance Tests**  
-[ ] **TC-RES-001:** Khi tỷ lệ lỗi Gateway lên 50% -> Circuit Breaker phải được kích hoạt.
+Sinh viên bấm nút "Pay" trên giao diện để thanh toán vé workshop. Frontend tạo idempotency key (UUID v4) duy nhất và gửi kèm request.
 
-[ ] **TC-RES-002:** Tắt Cache (Redis down) -> Idempotency tự động fallback dùng Database.
+Backend nhận request, kiểm tra idempotency key trong cache (Redis) trước tiên, sau đó kiểm tra database để đảm bảo giao dịch này chưa từn được xử lý. Nếu key đã tồn tại, trả về kết quả cached (không gọi gateway).
 
-[ ] **TC-PERF-001:** 100 yêu cầu thanh toán cùng lúc -> Xử lý dưới 2 giây (P95).
+Nếu là giao dịch mới, tạo payment record với status "pending". Gọi mock gateway thông qua Circuit Breaker.
 
-## 6. Implementation Notes & Code Reference
+Nếu thành công, cập nhật payment thành "success" và registration thành "confirmed". Cache lại kết quả trong 24 giờ. Tạo job thông báo cho sinh viên.
 
-(Phần này lưu trữ các đoạn code mẫu, Database Schema và logic chi tiết dành cho Developers)
+**Kết quả:**
+- Payment thành công
+- Registration confirmed
+- QR code được tạo
+- Email xác nhận được gửi
 
-### 6.1. Frontend Flow (Idempotency Generation)
+### Mock Payment Gateway
 
-```typescript
-// pages/my-registrations/[id].tsx
-const [idempotencyKey] = useState(() => uuidv4()); // Generate once!
+Mock gateway hỗ trợ giả lập các kịch bản:
+- Failure rate: 0-100% (mặc định 0%)
+- Timeout mode: Giữ request lơ lửng để kích hoạt Circuit Breaker
+- Latency: 200ms (mặc định)
 
-const handlePay = async () => {
-  try {
-    const response = await fetch("/api/payments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": idempotencyKey, // Same key for retries
-      },
-      body: JSON.stringify({
-        registrationId: registration.id,
-        amount: registration.workshop.price,
-      }),
-    });
+Admin có thể thay đổi các thông số này qua API để kiểm thử.
 
-    if (response.status === 503) {
-      // Circuit breaker OPEN
-      setError("Payment service temporarily unavailable. Please wait...");
-      startCountdown(30); // 30s countdown
-    } else if (response.ok) {
-      router.push("/my-registrations");
-    }
-  } catch (error) {
-    // Network error - safe to retry với same key
-    handlePay();
-  }
-};
-```
+### Circuit Breaker (3 trạng thái)
 
-### 6.2. Happy Path Logic (Pseudo-code)
+**CLOSED (Bình thường):**
+- Tất cả request đi qua gateway bình thường
+- Nếu 5 lỗi trong 60 giây → OPEN
 
-```
-1. Check Idempotency (Cache & DB).
-2. Create Payment Record (status: 'pending').
-3. Call Gateway qua CircuitBreaker:
-   try {
-     result = await circuitBreaker.call(() => mockGateway.charge(...));
-     payment.status = 'success';
-   } catch (error) {
-     Handle Circuit Open OR Card Failed;
-   }
-4. UPDATE payments SET status = ?, transaction_id = ? WHERE id = ?;
-5. IF payment.status == 'success' THEN
-     UPDATE registrations SET status = 'confirmed', payment_id = ?
-6. Cache Result (24h TTL) cho Idempotency Key.
-7. Queue Notification ('payment-success').
-```
+**OPEN (Ngắt mạch):**
+- Chặn ngay tất cả request → fail-fast
+- Trả về 503 Service Unavailable
+- Sau 30 giây → HALF_OPEN
 
-### 6.3. Mock Payment Gateway Service
+**HALF_OPEN (Thử nghiệm):**
+- Cho phép 1 request thử
+- Nếu thành công → CLOSED
+- Nếu thất bại → OPEN (reset 30 giây countdown)
 
-```typescript
-@Injectable()
-export class MockPaymentGatewayService {
-  private failureRate = 0;
-  private shouldTimeout = false;
+### Graceful Degradation (Hạ cấp dịch vụ)
 
-  setFailureRate(rate: number) {
-    this.failureRate = Math.min(100, Math.max(0, rate));
-  }
-  setTimeoutMode(enabled: boolean) {
-    this.shouldTimeout = enabled;
-  }
+Khi Circuit breaker ở trạng thái OPEN:
+- Request thanh toán bị chặn ngay lập tức
+- Backend giữ payment ở status "pending"
+- Tạo retry job với exponential backoff từ 5000ms
+- Trả về 202 Accepted cho client
+- Email thông báo: "Thanh toán đang xử lý, QR code sẽ được gửi qua email"
 
-  async charge(dto: ChargeDto): Promise<ChargeResult> {
-    if (this.shouldTimeout) {
-      await new Promise((resolve) => setTimeout(resolve, 15000));
-      throw new Error("Gateway timeout");
-    }
+**Kết quả:** Tất cả tính năng khác (xem workshop, profile) vẫn hoạt động
 
-    if (Math.random() * 100 < this.failureRate) {
-      throw new Error("Gateway error: Service unavailable");
-    }
+### 3.1. Retry với cùng idempotency key
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+Nếu client gửi lại request với idempotency key giống nhau, hệ thống kiểm tra cache. Nếu tìm thấy, trả về kết quả cached ngay lập tức (HTTP 200). Không gọi gateway, không trừ tiền 2 lần.
 
-    return {
-      success: true,
-      transactionId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      amount: dto.amount,
-      currency: dto.currency,
-    };
-  }
-}
-```
+**Kết quả:** Phản hồi giống như lần đầu tiên
 
-### 6.4. Circuit Breaker Service
+### 3.2. Retry với idempotency key khác nhưng vé đã thanh toán
 
-```typescript
-enum CircuitState {
-  CLOSED,
-  OPEN,
-  HALF_OPEN,
-}
+Nếu registration đã thanh toán thành công (hoặc đang xử lý), yêu cầu thanh toán lần 2 bị từ chối.
 
-@Injectable()
-export class CircuitBreakerService {
-  private state = CircuitState.CLOSED;
-  private failures: number[] = [];
-  // Config: 5 errors, 60s window, 30s open timeout, 1 half-open call
+**Lỗi:** 409 Conflict - Registration already paid
 
-  async call<T>(fn: () => Promise<T>, serviceName: string): Promise<T> {
-    await this.updateState(serviceName);
+### 3.3. Circuit Breaker OPEN (5+ lỗi trong 60 giây)
 
-    if (this.state === CircuitState.OPEN) {
-      // Check timeout to transition to HALF_OPEN
-      // Else throw ServiceUnavailableException
-    }
+Khi gateway gặp 5 lỗi liên tiếp trong 60 giây, Circuit Breaker chuyển sang OPEN. Tất cả request thanh toán bị từ chối ngay lập tức.
 
-    if (this.state === CircuitState.HALF_OPEN) {
-      // Allow limited calls, else throw Exception
-    }
+**Lỗi:** 503 Service Unavailable
 
-    try {
-      const result = await Promise.race([fn(), this.timeoutPromise(10000)]);
-      await this.onSuccess(serviceName);
-      return result;
-    } catch (error) {
-      await this.onFailure(serviceName, error);
-      throw error;
-    }
-  }
-  // onSuccess and onFailure update state and push to Redis...
-}
-```
+**Hành động:** Frontend hiển thị countdown 30 giây, sau đó cho phép thử lại
 
-### 6.5. Graceful Degradation & Retry Worker
+### 3.4. Thẻ bị từ chối
 
-```typescript
-// Payment Retry Flow Pseudo-code (catch block)
-IF error instanceof ServiceUnavailableException THEN
-  a. Keep payment status = 'pending'
-  b. await paymentRetryQueue.add('retry-payment', { paymentId, registrationId }, { backoff })
-  c. Update registration notes
-  d. Trả về HTTP 202 Accepted cho user.
+Khi thẻ hết tiền, sai thông tin, hoặc hết hạn, gateway trả về lỗi.
 
-// payment-retry.processor.ts
-@Processor('payment-retry')
-export class PaymentRetryProcessor {
-  @Process('retry-payment')
-  async handleRetry(job: Job<RetryPaymentDto>) {
-    const payment = await this.paymentRepo.findOne({ id: job.data.paymentId });
-    if (payment.status !== 'pending') return;
+**Lỗi:** 402 Payment Required
 
-    try {
-      const result = await this.circuitBreaker.call(() => gateway.charge(...));
-      // Update success state for payment & registration
-      // Send success notification
-    } catch (error) {
-      if (job.attemptsMade >= 5) {
-        payment.status = 'failed';
-        await this.paymentRepo.save(payment);
-        // Manual intervention needed notification
-      }
-      throw error; // Bull retry trigger
-    }
-  }
-}
-```
+**Hành động:** Payment được đánh dấu "failed", registration giữ nguyên để sinh viên thử lại với thẻ khác
 
-### 6.6. Backend Validation Snippets
+### 3.5. Payment timeout (quá 10 phút)
 
-**Check chống double charge khi khác Idempotency Key:**
+Nếu gateway response chậm, hệ thống vẫn giữ payment ở "pending" và tạo job retry.
 
-```typescript
-async processPayment(dto: ProcessPaymentDto) {
-  const registration = await this.registrationRepo.findOne({
-    where: { id: dto.registrationId },
-    relations: ['payment']
-  });
+**Kết quả:** 202 Accepted - Payment is being processed
 
-  if (registration.payment && registration.payment.status === 'success') {
-    throw new ConflictException('Registration already paid');
-  }
-  // Continue with idempotency check...
-}
-```
+---
 
-**Check lỗi khi từ chối thẻ (Card declined):**
+## Tiêu chí chấp nhận
 
-```typescript
-// Trong khối catch của processPayment
-} else {
-  // Payment failed (card declined, insufficient funds, etc.)
-  payment.status = 'failed';
-  payment.errorMessage = error.message;
-  await this.paymentRepo.save(payment);
-  // Không rollback registration (giữ lại để user retry)
-}
-```
+### Kiểm thử chức năng
+
+- Thanh toán thành công → Registration xác nhận, cấp QR code
+- Retry với cùng idempotency key → Trả về cache, không trừ tiền 2 lần
+- Retry với key khác nhưng vé đã thanh toán → Lỗi 409
+- Gateway timeout → Circuit breaker ghi nhận 1 lỗi
+- 5 lỗi liên tiếp → Circuit ngắt mạch (OPEN)
+- Circuit OPEN → Chặn request, trả về 503
+- Sau 30 giây → Circuit chuyển HALF_OPEN
+- Thanh toán thẻ bị từ chối → Payment failed, vé giữ nguyên
+- Job retry tự động chạy nếu Circuit OPEN
+
+### Kiểm thử độ tin cậy
+
+- Tỷ lệ lỗi gateway 50% → Circuit Breaker kích hoạt
+- Redis down → Idempotency fallback dùng database
+- 100 yêu cầu thanh toán đồng thời → Xử lý < 2 giây (P95)
+
+## Ràng buộc
+
+| Ràng buộc | Giá trị |
+|-----------|---------|
+| Failure threshold (Circuit Breaker) | 5 lỗi |
+| Time window (Circuit Breaker) | 60 giây |
+| Cooldown (Circuit Breaker) | 30 giây |
+| Payment timeout | 10 phút |
+| Retry attempts | 5 lần |
+| Retry backoff | Exponential, từ 5000ms |
+| Idempotency key TTL (cache) | 24 giờ |
+| Idempotency key lock | 30 giây |
+| Default failure rate | 0% |
+| Default latency | 200ms |
+| Payment processing time (P95) | < 2 giây |
+| Idempotency check (P95) | < 50ms |

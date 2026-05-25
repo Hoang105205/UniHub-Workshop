@@ -1,5 +1,3 @@
-export const MOCK_GATEWAY_REDIS_TOKEN = 'MOCK_GATEWAY_REDIS_TOKEN';
-
 export const MOCK_GATEWAY_QUEUE = 'payment_queue';
 export const MOCK_GATEWAY_JOB = 'payment_job';
 

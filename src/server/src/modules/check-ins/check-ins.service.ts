@@ -35,8 +35,6 @@ export class CheckInsService {
       const registrationRepository = manager.getRepository(Registration);
       const checkInRepository = manager.getRepository(CheckIn);
       const userRepository = manager.getRepository(User);
-      
-      this.logger.debug(`Attempting to check in with QR code: ${dto.qr_code} by staff ID: ${staffId}`);
 
       const staff = await userRepository.findOne({ where: { id: staffId } });
       if (!staff) {
@@ -45,8 +43,6 @@ export class CheckInsService {
       if (![Role.STAFF, Role.ADMIN].includes(staff.role)) {
         throw new BadRequestException('User is not allowed to check in');
       }
-
-      this.logger.debug(`Staff ${staff.name} (${staff.id}) is authorized to perform check-in.`);
 
       const registration = await registrationRepository
         .createQueryBuilder('registration')

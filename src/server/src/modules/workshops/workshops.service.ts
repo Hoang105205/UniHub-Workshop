@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThan, Repository } from 'typeorm';
@@ -16,6 +17,8 @@ import { CreateWorkshopDto } from './dto/create-workshop.dto';
 import { UpdateWorkshopDto } from './dto/update-workshop.dto';
 import { SupabaseStorageService } from './supabase-storage.service';
 import type { Multer } from 'multer';
+import Redis from 'ioredis';
+import { REDIS_CLIENT_TOKEN } from '../../redis/redis.constants';
 
 export interface WorkshopListItem {
   id: string;
@@ -78,6 +81,7 @@ export class WorkshopsService {
     private readonly registrationRepository: Repository<Registration>,
     private readonly storageService: SupabaseStorageService,
     private readonly aiSummaryQueue: AiSummaryQueueService,
+    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis,
   ) {}
 
   async create(
@@ -198,6 +202,16 @@ export class WorkshopsService {
     page: number,
     limit: number,
   ): Promise<WorkshopListResponse> {
+    // 1. Tạo Cache Key duy nhất cho từng trang
+    const cacheKey = `workshops:list:page:${page}:limit:${limit}`;
+
+    // 2. Kiểm tra trong Redis xem có không
+    const cachedData = await this.redis.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+
+    // 3. Nếu Cache Miss -> Chạy logic query Database cũ của bạn
     const [items, total] = await this.workshopRepository.findAndCount({
       where: {
         startTime: MoreThan(new Date()),
@@ -225,7 +239,7 @@ export class WorkshopsService {
 
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
-    return {
+    const result = {
       data,
       meta: {
         page,
@@ -234,21 +248,45 @@ export class WorkshopsService {
         totalPages,
       },
     };
+
+    // 4. Lưu kết quả vào Redis với TTL là 15 giây (EX = Expire, 15 = seconds)
+    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 15);
+
+    return result;
   }
 
   async getDetail(id: string, userId: string): Promise<WorkshopDetailResponse> {
-    const workshop = await this.workshopRepository.findOne({
-      where: { id },
-    });
+    const cacheKey = `workshops:detail:${id}`;
 
-    if (!workshop) {
-      throw new NotFoundException('Workshop not found');
+    // ==========================================
+    // NHỊP 1: Lấy Dữ liệu CHUNG (Từ Cache hoặc DB)
+    // ==========================================
+    let workshop;
+
+    const cachedData = await this.redis.get(cacheKey);
+
+    if (cachedData) {
+      workshop = JSON.parse(cachedData);
+    } else {
+      // Nếu Cache Miss, gọi DB lấy thông tin
+      workshop = await this.workshopRepository.findOne({
+        where: { id },
+      });
+
+      if (!workshop) {
+        throw new NotFoundException('Workshop not found');
+      }
+
+      await this.redis.set(cacheKey, JSON.stringify(workshop), 'EX', 10);
     }
 
-    const ticketCount = await this.registrationRepository.count({
+    // ==========================================
+    // NHỊP 2: Lấy Dữ liệu RIÊNG (Query DB trực tiếp)
+    // ==========================================
+    const hasTicket = await this.registrationRepository.exists({
       where: {
         workshopId: id,
-        userId,
+        userId: userId,
         status: In([
           RegistrationStatus.CONFIRMED,
           RegistrationStatus.CHECKED_IN,
@@ -257,19 +295,13 @@ export class WorkshopsService {
       },
     });
 
+    // ==========================================
+    // NHỊP 3: Trộn dữ liệu và trả về Client
+    // ==========================================
     return {
-      id: workshop.id,
-      title: workshop.title,
-      detail: workshop.detail,
-      capacity: workshop.capacity,
-      registeredCount: workshop.registeredCount,
+      ...workshop,
       availableSeats: workshop.capacity - workshop.registeredCount,
-      price: workshop.price,
-      startTime: workshop.startTime,
-      endTime: workshop.endTime,
-      room: workshop.room,
-      speaker: workshop.speaker,
-      hasTicket: ticketCount > 0,
+      hasTicket: hasTicket,
     };
   }
 
@@ -318,10 +350,13 @@ export class WorkshopsService {
       .createQueryBuilder('workshop')
       .select('workshop.id')
       .where('workshop.room = :room', { room })
-      .andWhere('(workshop.start_time, workshop.end_time) OVERLAPS (:start, :end)', {
-        start: startTime,
-        end: endTime,
-      });
+      .andWhere(
+        '(workshop.start_time, workshop.end_time) OVERLAPS (:start, :end)',
+        {
+          start: startTime,
+          end: endTime,
+        },
+      );
 
     if (excludeId) {
       query.andWhere('workshop.id <> :excludeId', { excludeId });

@@ -8,14 +8,14 @@ import {
 } from 'typeorm';
 import { Registration } from './registration.entity';
 import { CheckIn } from './check-in.entity';
-import { Role } from './roles.enum';  
+import { Role } from './roles.enum';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'student_id', length: 10, nullable: true })
+  @Column({ name: 'student_id', length: 10, nullable: true, unique: true })
   studentId: string;
 
   @Column({ name: 'full_name', length: 100 })
@@ -27,7 +27,12 @@ export class User {
   @Column({ name: 'password_hash', nullable: true })
   passwordHash: string;
 
-  @Column({ name: 'user_role', type: 'enum', enum: Role, default: Role.STUDENT })
+  @Column({
+    name: 'user_role',
+    type: 'enum',
+    enum: Role,
+    default: Role.STUDENT,
+  })
   role: Role;
 
   // --- RELATIONSHIPS ---

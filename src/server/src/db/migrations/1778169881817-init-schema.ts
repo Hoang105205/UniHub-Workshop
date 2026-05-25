@@ -1,13 +1,13 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitSchema1777725652098 implements MigrationInterface {
-    name = 'InitSchema1777725652098'
+export class InitSchema1778169881817 implements MigrationInterface {
+    name = 'InitSchema1778169881817'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TYPE "public"."check_ins_sync_status_enum" AS ENUM('synced', 'pending_sync')`);
         await queryRunner.query(`CREATE TABLE "check_ins" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "registration_id" uuid NOT NULL, "staff_id" uuid NOT NULL, "sync_status" "public"."check_ins_sync_status_enum" NOT NULL, "device_id" character varying(100) NOT NULL, "checked_in_at" TIMESTAMP WITH TIME ZONE NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_ec62eb9e9e2b46305f66e50272c" UNIQUE ("registration_id"), CONSTRAINT "REL_ec62eb9e9e2b46305f66e50272" UNIQUE ("registration_id"), CONSTRAINT "PK_fac7f27bc829a454ad477c13f62" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."users_user_role_enum" AS ENUM('student', 'staff', 'admin')`);
-        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "student_id" character varying(10), "full_name" character varying(100) NOT NULL, "email" character varying NOT NULL, "password_hash" character varying, "user_role" "public"."users_user_role_enum" NOT NULL DEFAULT 'student', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "student_id" character varying(10), "full_name" character varying(100) NOT NULL, "email" character varying NOT NULL, "password_hash" character varying, "user_role" "public"."users_user_role_enum" NOT NULL DEFAULT 'student', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_4bcc4fd204f448ad671c0747ab4" UNIQUE ("student_id"), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."payments_status_enum" AS ENUM('pending', 'success', 'failed', 'system_failure')`);
         await queryRunner.query(`CREATE TABLE "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "registration_id" uuid NOT NULL, "idempotency_key" character varying(100), "transaction_id" character varying(255), "status" "public"."payments_status_enum" NOT NULL DEFAULT 'pending', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_dcf8450959aadff1b025a2434d7" UNIQUE ("registration_id"), CONSTRAINT "UQ_59dcef70bd19850783c84f840e5" UNIQUE ("idempotency_key"), CONSTRAINT "REL_dcf8450959aadff1b025a2434d" UNIQUE ("registration_id"), CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."registrations_status_enum" AS ENUM('pending', 'confirmed', 'cancelled', 'system_failure', 'checked_in')`);
@@ -15,6 +15,8 @@ export class InitSchema1777725652098 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "UQ_active_registration" ON "registrations" ("workshop_id", "user_id") WHERE status NOT IN ('cancelled', 'system_failure')`);
         await queryRunner.query(`CREATE TABLE "workshops" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying(255) NOT NULL, "detail" text NOT NULL, "capacity" integer NOT NULL, "registered_count" integer NOT NULL DEFAULT '0', "price" numeric(10,2) NOT NULL DEFAULT '0', "start_time" TIMESTAMP WITH TIME ZONE NOT NULL, "end_time" TIMESTAMP WITH TIME ZONE NOT NULL, "room" character varying(100) NOT NULL, "speaker" character varying(100) NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6d0e82a124f5b53df91c8989848" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "idx_workshops_start_time" ON "workshops" ("start_time") `);
+        await queryRunner.query(`CREATE TYPE "public"."sync_histories_status_enum" AS ENUM('PROCESSING', 'SUCCESS', 'FAILED')`);
+        await queryRunner.query(`CREATE TABLE "sync_histories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "filename" character varying(255) NOT NULL, "status" "public"."sync_histories_status_enum" NOT NULL, "total_records_processed" integer NOT NULL DEFAULT '0', "error_message" text, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_144f5156207e0829e9a1eff0a26" PRIMARY KEY ("id"))`);
         await queryRunner.query(`ALTER TABLE "check_ins" ADD CONSTRAINT "FK_ec62eb9e9e2b46305f66e50272c" FOREIGN KEY ("registration_id") REFERENCES "registrations"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "check_ins" ADD CONSTRAINT "FK_a8f00d1aa1dfd6f6307e1abe494" FOREIGN KEY ("staff_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "payments" ADD CONSTRAINT "FK_dcf8450959aadff1b025a2434d7" FOREIGN KEY ("registration_id") REFERENCES "registrations"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
@@ -28,6 +30,8 @@ export class InitSchema1777725652098 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_dcf8450959aadff1b025a2434d7"`);
         await queryRunner.query(`ALTER TABLE "check_ins" DROP CONSTRAINT "FK_a8f00d1aa1dfd6f6307e1abe494"`);
         await queryRunner.query(`ALTER TABLE "check_ins" DROP CONSTRAINT "FK_ec62eb9e9e2b46305f66e50272c"`);
+        await queryRunner.query(`DROP TABLE "sync_histories"`);
+        await queryRunner.query(`DROP TYPE "public"."sync_histories_status_enum"`);
         await queryRunner.query(`DROP INDEX "public"."idx_workshops_start_time"`);
         await queryRunner.query(`DROP TABLE "workshops"`);
         await queryRunner.query(`DROP INDEX "public"."UQ_active_registration"`);

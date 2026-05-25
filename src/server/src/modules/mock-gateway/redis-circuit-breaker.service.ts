@@ -6,7 +6,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import {
   MOCK_GATEWAY_CIRCUIT_COOLDOWN_MS,
@@ -15,9 +15,9 @@ import {
   MOCK_GATEWAY_CIRCUIT_OPENED_AT_KEY,
   MOCK_GATEWAY_CIRCUIT_PROBE_LOCK_KEY,
   MOCK_GATEWAY_CIRCUIT_STATE_KEY,
-  MOCK_GATEWAY_REDIS_TOKEN,
   MockGatewayState,
 } from './mock-gateway.constants';
+import { REDIS_CLIENT_TOKEN } from '../../redis/redis.constants';
 
 type CircuitContext = {
   requestId: string;
@@ -29,9 +29,7 @@ type CircuitContext = {
 export class RedisCircuitBreakerService {
   private readonly logger = new Logger(RedisCircuitBreakerService.name);
 
-  constructor(
-    @Inject(MOCK_GATEWAY_REDIS_TOKEN) private readonly redis: Redis,
-  ) {}
+  constructor(@Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis) {}
 
   async execute<T>(action: () => Promise<T>): Promise<T> {
     const context = await this.beforeCall();
@@ -87,7 +85,9 @@ export class RedisCircuitBreakerService {
     const lockAcquired = await this.redis.set(
       MOCK_GATEWAY_CIRCUIT_PROBE_LOCK_KEY,
       requestId,
-      { nx: true, px: MOCK_GATEWAY_CIRCUIT_COOLDOWN_MS },
+      'PX',
+      MOCK_GATEWAY_CIRCUIT_COOLDOWN_MS,
+      'NX',
     );
 
     if (!lockAcquired) {
@@ -125,9 +125,10 @@ export class RedisCircuitBreakerService {
 
     // TRƯỜNG HỢP 2: Nếu đang bình thường (CLOSED) mà thành công
     // Ta sẽ giảm count lỗi đi 1 đơn vị (nhưng không thấp hơn 0)
-    const currentCount = await this.redis.get<number>(
+    const currentCountRaw = await this.redis.get(
       MOCK_GATEWAY_CIRCUIT_FAIL_COUNT_KEY,
     );
+    const currentCount = currentCountRaw ? Number(currentCountRaw) : null;
 
     if (currentCount && currentCount > 0) {
       // Dùng DECR của Redis để đảm bảo tính nguyên tử (Atomic)
@@ -175,7 +176,7 @@ export class RedisCircuitBreakerService {
   }
 
   private async getState(): Promise<MockGatewayState> {
-    const state = await this.redis.get<string>(MOCK_GATEWAY_CIRCUIT_STATE_KEY);
+    const state = await this.redis.get(MOCK_GATEWAY_CIRCUIT_STATE_KEY);
     return this.normalizeState(state);
   }
 
@@ -188,9 +189,7 @@ export class RedisCircuitBreakerService {
   }
 
   private async getOpenedAt(): Promise<number> {
-    const value = await this.redis.get<string>(
-      MOCK_GATEWAY_CIRCUIT_OPENED_AT_KEY,
-    );
+    const value = await this.redis.get(MOCK_GATEWAY_CIRCUIT_OPENED_AT_KEY);
     const timestamp = Number(value);
 
     if (!Number.isFinite(timestamp) || timestamp <= 0) {

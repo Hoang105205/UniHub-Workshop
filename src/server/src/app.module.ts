@@ -12,20 +12,27 @@ import { WorkshopsModule } from './modules/workshops/workshops.module';
 import { BullModule } from '@nestjs/bull';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { bullConfig } from './config/bull.config';
-import { EmailModule } from './modules/email/email.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { CsvSyncModule } from './modules/csv-sync/csv-sync.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { getThrottlerConfig } from './config/throttler.config';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(databaseConfig),
+    ThrottlerModule.forRootAsync(getThrottlerConfig),
     BullModule.forRootAsync(bullConfig),
     EventEmitterModule.forRoot({ global: true }),
-    EmailModule,
+    NotificationModule,
+    CsvSyncModule,
     AuthModule,
     CheckInsModule,
     RegistrationsModule,
     MockGatewayModule,
     WorkshopsModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],
