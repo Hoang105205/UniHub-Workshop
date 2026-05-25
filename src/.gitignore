@@ -9,9 +9,10 @@ build/
 out/
 
 # Environment variables
-.env
+.env.*
 .env.local
 .env.*.local
+.env.production
 
 # IDE rác
 .vscode/

@@ -1,0 +1,46 @@
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <title>Ticket Cancelled</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f6f7f9;
+        color: #1a1a1a;
+      }
+      .card {
+        max-width: 640px;
+        margin: 24px auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      .meta {
+        margin: 0 0 12px;
+      }
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #666666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='card'>
+      <h1>Your ticket was cancelled</h1>
+      <p class='meta'><strong>Workshop:</strong> {{workshop.title}}</p>
+      <p class='meta'><strong>Time:</strong> {{workshop.startTime}}</p>
+      <p class='meta'><strong>Location:</strong> {{workshop.location}}</p>
+
+      <p>If this was a mistake, you can register again anytime.</p>
+
+      <p class='footer'>Thank you for letting us know.</p>
+    </div>
+  </body>
+</html>
